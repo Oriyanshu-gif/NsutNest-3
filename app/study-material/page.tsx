@@ -110,10 +110,10 @@ function StudyMaterialBody() {
                   {title !== subject.code && <span className="attCode">{subject.code}</span>}
                 </div>
                 <div className="studyChips">
-                  {RESOURCE_CHIPS.map(({ label, kind, icon: Icon }) => (
+                  {RESOURCE_CHIPS.map(({ label, icon: Icon }) => (
                     <button
                       className="studyChip"
-                      key={kind}
+                      key={label}
                       type="button"
                       onClick={() => setComingSoon(`${title} · ${label}`)}
                     >
