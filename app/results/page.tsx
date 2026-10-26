@@ -1,14 +1,15 @@
 "use client";
 
 /**
- * Results — the original NSUT leaderboard, now living at /results behind the
- * HUB sidebar. Behaviour is unchanged: one card per student ranked by the
- * university's total CGPA, or by SGPA when a semester is selected.
+ * Results — the NSUT leaderboard, restyled to match the rest of the hub
+ * (same header, panel-card and chip language as Study material / TNP).
+ * Behaviour is unchanged: one card per student ranked by the university's
+ * total CGPA, or by SGPA when a semester is selected.
  */
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Search, Trophy, ChevronDown, Loader2, AlertTriangle } from "lucide-react";
+import { Search, Trophy, ChevronDown, Loader2, TriangleAlert, GraduationCap, ArrowUpRight, RotateCcw, Layers } from "lucide-react";
 import {
   SEMESTERS, academicYearLabel, examPeriod, loadStudents, sgpaLabel, type Student,
 } from "../../lib/data";
@@ -120,120 +121,140 @@ function ResultsBoard() {
   const resetFilters = () => { setQuery(""); setYear("All"); setSemester("All"); setBranches([]); };
 
   return (
-    <main className="resultsShell">
-      <section className="hero">
-        <div className="eyebrow"><span /> STUDENT PERFORMANCE INDEX</div>
-        <h1>Results, ranked<span className="accentDot">.</span></h1>
-        <p>Search NSUT B.Tech semester results across batches and branches.</p>
-      </section>
+    <main className="rsShell">
+      <header className="rsHead">
+        <div>
+          <small className="panelKicker">NSUT GAZETTE · B.TECH RESULTS</small>
+          <h1>Results<span className="rsAccent">, ranked</span>.</h1>
+          <p>Every semester gazette and CGPA table, searchable by name, roll number, batch or branch.</p>
+        </div>
+        <span className="rsHeadChip"><Layers size={14} />{students ? `${board.length.toLocaleString("en-IN")} in view` : "Loading records"}</span>
+      </header>
 
-      <section className="filters">
-        <label className="search">
-          <Search size={21} />
+      <section className="hubCard rsFilterPanel">
+        <label className="rsSearch">
+          <Search size={18} />
           <input value={query} onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search by student name, roll number or branch..." />
+            placeholder="Search by student name, roll number or branch…"
+            aria-label="Search students by name, roll number or branch" />
           {query && <button onClick={() => setQuery("")} aria-label="Clear search">×</button>}
         </label>
-        <div className="filterGroup">
-          <div className="label">BATCH YEAR</div>
+
+        <div className="rsFilterRow">
+          <span className="rsFilterLabel">Batch</span>
           <div className="pills">
-            <button className={`pill ${year === "All" ? "active" : ""}`} onClick={() => setYear("All")}>All</button>
-            {years.map((y) => <button key={y} className={`pill ${year === y ? "active" : ""}`} onClick={() => setYear(y)}>{y}</button>)}
+            <button className={`rsChip ${year === "All" ? "rsChipOn" : ""}`} onClick={() => setYear("All")}>All years</button>
+            {years.map((y) => <button key={y} className={`rsChip ${year === y ? "rsChipOn" : ""}`} onClick={() => setYear(y)}>{y} batch</button>)}
           </div>
         </div>
-        <div className="filterGroup">
-          <div className="label">SEMESTER</div>
+        <div className="rsFilterRow">
+          <span className="rsFilterLabel">Semester</span>
           <div className="pills">
-            <button className={`pill ${semester === "All" ? "active" : ""}`} onClick={() => setSemester("All")}>All</button>
-            {SEMESTERS.map((s) => <button key={s} className={`pill ${semester === String(s) ? "active" : ""}`} onClick={() => setSemester(String(s))}>Sem {s}</button>)}
+            <button className={`rsChip ${semester === "All" ? "rsChipOn" : ""}`} onClick={() => setSemester("All")}>All semesters</button>
+            {SEMESTERS.map((s) => <button key={s} className={`rsChip ${semester === String(s) ? "rsChipOn" : ""}`} onClick={() => setSemester(String(s))}>Sem {s}</button>)}
           </div>
         </div>
-        <div className="filterGroup">
-          <div className="label">BRANCH <span>(select multiple)</span></div>
+        <div className="rsFilterRow">
+          <span className="rsFilterLabel">Branch<br /><small>multiple</small></span>
           <div className="pills">
-            <button className={`pill ${branches.length === 0 ? "active" : ""}`} onClick={() => setBranches([])}>All</button>
-            {branchList.map((b) => <button key={b} className={`pill ${branches.includes(b) ? "active" : ""}`} onClick={() => toggleBranch(b)}>{b}</button>)}
+            <button className={`rsChip ${branches.length === 0 ? "rsChipOn" : ""}`} onClick={() => setBranches([])}>All branches</button>
+            {branchList.map((b) => <button key={b} className={`rsChip ${branches.includes(b) ? "rsChipOn" : ""}`} onClick={() => toggleBranch(b)}>{b}</button>)}
           </div>
         </div>
+
+        {isFiltered && (
+          <button className="rsReset" onClick={resetFilters}>
+            <RotateCcw size={13} /> Reset filters
+          </button>
+        )}
       </section>
 
-      <section className="leaderboard">
-        <div className="boardHead">
-          <div><Trophy size={19} /><h2>Student leaderboard</h2></div>
-          <span>
+      <section className="hubCard rsBoard">
+        <div className="rsBoardHead">
+          <div className="rsBoardTitle">
+            <span className="rsTrophy"><Trophy size={16} /></span>
+            <div>
+              <small className="panelKicker">STUDENT LEADERBOARD</small>
+              <h2>{semesterFilter === null ? "Ranked by total CGPA" : `Ranked by semester ${semesterFilter} SGPA`}</h2>
+            </div>
+          </div>
+          <span className="rsBoardCount" aria-live="polite">
             {students
               ? `Showing ${shown.length.toLocaleString("en-IN")} of ${board.length.toLocaleString("en-IN")} students`
-              : "Loading…"}
+              : "…"}
           </span>
         </div>
 
         {error ? (
           <div className="empty">
-            <AlertTriangle size={30} />
+            <TriangleAlert size={30} />
             <h3>Could not load the results</h3>
             <p>{error}</p>
+            <button className="rsMore" onClick={() => window.location.reload()}>Reload page</button>
           </div>
         ) : !students ? (
           <div className="loading"><Loader2 className="spin" size={24} /><p>Loading result records…</p></div>
         ) : !board.length ? (
           <div className="empty">
-            <Search size={30} />
+            <GraduationCap size={30} />
             <h3>No students found</h3>
             <p>Try another name, roll number, batch, or branch.</p>
-            <button className="pill active" onClick={resetFilters}>Reset filters</button>
+            <button className="rsMore" onClick={resetFilters}>Reset filters</button>
           </div>
         ) : (
           <>
-            <p className="viewNote">
+            <p className="rsNote">
               {semesterFilter === null
                 ? "One card per student, ranked by the university's total CGPA."
                 : `One card per student, ranked by semester ${semesterFilter} SGPA (better attempt where the same semester was sat twice).`}
               {" Open a profile for the semester-by-semester breakdown."}
             </p>
-            <div className="studentList">
+            <div className="rsGrid">
               {shown.map((e, i) => {
                 const headline = semesterFilter === null ? e.cgpa : e.record?.sgpa ?? null;
                 return (
-                <Link href={`/student/${encodeURIComponent(e.roll)}`} className="student studentLink" key={e.roll}>
-                  <div className="studentTop">
-                    <div className="rank">#{i + 1}</div>
-                    <div className="identity">
-                      <h3>{e.student.name}</h3>
-                      <p>{e.roll}</p>
-                      <div className="tags">
-                        <span>{e.student.branch}</span>
-                        <span>{e.student.year} batch</span>
-                        <span>{e.semesters} semester{e.semesters === 1 ? "" : "s"}</span>
-                        {semesterFilter !== null && (
-                          <>
-                            <span>SEM {semesterFilter}</span>
-                            {e.record && <span>{academicYearLabel(e.record.ay)}</span>}
-                          </>
-                        )}
-                        {i === 0 && headline !== null && (
-                          <span className="topRank"><Trophy size={12} /> {isFiltered ? "BEST IN VIEW" : "TOP CGPA"}</span>
+                  <Link href={`/student/${encodeURIComponent(e.roll)}`} className="rsCard" key={e.roll}>
+                    <div className="rsCardTop">
+                      <div className={`rsRank${i < 3 ? ` rsRank${i + 1}` : ""}`}>#{i + 1}</div>
+                      <div className="rsIdentity">
+                        <h3>{e.student.name}</h3>
+                        <p>{e.roll}</p>
+                        <div className="rsTags">
+                          <span>{e.student.branch}</span>
+                          <span className="rsTagMuted">{e.student.year} batch</span>
+                          <span className="rsTagMuted">{e.semesters} semester{e.semesters === 1 ? "" : "s"}</span>
+                        </div>
+                      </div>
+                      <div className="rsScore">
+                        <b className={headline === 0 ? "zeroScore" : ""}>{sgpaLabel(headline)}</b>
+                        <small>{semesterFilter === null ? "CGPA" : "SGPA"}</small>
+                        {semesterFilter !== null && e.cgpa !== null && (
+                          <small className="totalCgpaPill">CGPA {e.cgpa.toFixed(2)}</small>
                         )}
                       </div>
                     </div>
-                    <div className="cgpa">
-                      <b className={headline === 0 ? "zeroScore" : ""}>{sgpaLabel(headline)}</b>
-                      <small>{semesterFilter === null ? "CGPA" : "SGPA"}</small>
-                      {semesterFilter !== null && e.cgpa !== null && (
-                        <small className="totalCgpaPill">CGPA {e.cgpa.toFixed(2)}</small>
-                      )}
+                    {semesterFilter !== null && e.record && (
+                      <div className="rsSemMeta">
+                        <span className="rsSemBadge">SEM {semesterFilter}</span>
+                        <span className="rsSemYear">{academicYearLabel(e.record.ay)}</span>
+                      </div>
+                    )}
+                    <div className="rsCardFoot">
+                      <span className="rsFootMeta">
+                        {semesterFilter === null
+                          ? (e.best
+                              ? <>Best semester <b>{e.best.semester}</b> · <b>{e.best.sgpa.toFixed(2)}</b> SGPA</>
+                              : "No SGPA above zero")
+                          : (e.record
+                              ? (e.record.sgpa === null ? "Result later (RL) announced by the university" : `${examPeriod(e.record.ay, semesterFilter)} result`)
+                              : "")}
+                      </span>
+                      <span className="rsProfileLink">Profile <ArrowUpRight size={13} /></span>
                     </div>
-                  </div>
-                  <div className="cardFooter">
-                    <span className="percentile"><i />
-                      {semesterFilter === null
-                        ? (e.best ? `Best semester ${e.best.semester} · ${e.best.sgpa.toFixed(2)}` : "No SGPA above zero")
-                        : (e.record
-                            ? (e.record.sgpa === null ? "Result later / RL" : `${examPeriod(e.record.ay, semesterFilter)} result`)
-                            : "")}
-                    </span>
-                    <span className="pdfHint">View student profile ↗</span>
-                  </div>
-                </Link>
+                    {i === 0 && headline !== null && (
+                      <span className="rsTopBadge"><Trophy size={12} /> {isFiltered ? "Best in view" : "Top CGPA"}</span>
+                    )}
+                  </Link>
                 );
               })}
             </div>
@@ -241,15 +262,16 @@ function ResultsBoard() {
         )}
 
         {students && shown.length < board.length && (
-          <button className="loadMore" onClick={() => setLimit((l) => l + PAGE_STEP)}>
-            Show {Math.min(PAGE_STEP, board.length - shown.length)} more
+          <button className="rsMore" onClick={() => setLimit((l) => l + PAGE_STEP)}>
+            Show {Math.min(PAGE_STEP, board.length - shown.length)} more students
             <ChevronDown size={16} />
           </button>
         )}
       </section>
 
-      <footer>
-        <p>Unofficial student project · Data imported from the 2022–23 to 2025–26 semester gazettes and CGPA tables</p>
+      <footer className="hubFooter">
+        <p>NsutNest · unofficial student project</p>
+        <small>Compiled from the 2022–23 to 2025–26 semester gazettes and CGPA tables.</small>
       </footer>
     </main>
   );

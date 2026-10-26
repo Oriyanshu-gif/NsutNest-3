@@ -79,7 +79,10 @@ const options = imsCookieOptions();
 assert.equal(options.httpOnly, true, 'the session cookie is HttpOnly');
 assert.equal(options.sameSite, 'strict', 'the session cookie is SameSite=Strict');
 assert.equal(options.path, '/api/ims', 'the cookie is scoped to the IMS routes');
-assert.equal(options.maxAge, IMS_SESSION_SECONDS, 'the cookie expires with the session');
+// The browser cookie outlives a single login attempt on purpose: it stores the
+// session id a refresh route can re-use (the server re-checks the payload), so
+// it is a day-long cookie, not IMS_SESSION_SECONDS long.
+assert.equal(options.maxAge, 12 * 60 * 60, 'the browser cookie keeps the session for the refresh window');
 assert.equal(options.secure, process.env.NODE_ENV === 'production', 'Secure follows the deployment');
 assert.equal(IMS_COOKIE_NAME, 'nsutnest_ims', 'the cookie name is unchanged');
 

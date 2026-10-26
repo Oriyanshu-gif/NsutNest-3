@@ -1,0 +1,48 @@
+# Introducing NsutNest: Your NSUT Student Hub
+
+Hey r/NSUT_Delhi folks! 👋
+
+I built **NsutNest** - a personal dashboard/webapp designed specifically for NSUT students. After spending way too much time toggling between the IMS portal, results, and notices, I decided to consolidate everything in one place.
+
+## What it does:
+
+📊 **Attendance & Results** - View subject-wise attendance, calculate how many more classes you can miss, check SGPA/CGPA from the official gazette
+
+🔔 **IMS Notices** - Real-time notices from the NSUT IMS portal with search and filtering
+
+🏛️ **Campus Hangouts** - Discover popular spots around campus (sweets, cafés, restaurants)
+
+🎪 **Fest Info** - Details about Moksha, Innovision, Resonanz and other campus events
+
+🎨 **Community** - Browse r/NSUT_Delhi threads, filter by scenes (coding, music, sports, etc.), and even compose Reddit posts directly from the app
+
+📱 **PWA** - Install it as a progressive web app on your phone/desktop for quick access
+
+## Key features:
+
+- **Live IMS attendance** - Sign in once, your data stays saved on your device
+- **SGPA/CGPA calculator** - Weighted CGPA from the gazette data
+- **Student profile** - Look up your roll number, see your rank in the batch
+- **Notices search** - Filter by department, search by keyword
+- **Campus map** - Explore NSUT buildings, hostels, grounds
+- **No account needed** - Everything works offline after initial load
+
+## Tech stack:
+
+Built with Next.js, React, TypeScript, and TailwindCSS. Data comes from the official NSUT datasets (students.json, subjects.json) and the IMS API. The Reddit integration just opens threads in your browser - I didn't want to overstep!
+
+## Get it:
+
+- **Web**: https://nsut-nest.vercel.app (or deploy your own)
+- **Source**: GitHub [link if you're curious]
+- **Install**: Add to home screen for app-like experience
+
+I'm a final-year student too, so I prioritized things that actually matter - no fake engagement, just real data and useful links. Would love feedback from the community, especially if I'm missing anything that would actually help you guys day-to-day.
+
+What do you think? Would you use something like this, or prefer sticking with the official portals? 👇
+
+---
+
+*This is an unofficial student project. Not affiliated with NSUT or the university administration.*
+
+#NSUT #NSUTDelhi #r/NSUT_Delhi #studentlife #webapp #Nextjs #React #Hacktober
