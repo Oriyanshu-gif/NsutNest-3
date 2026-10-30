@@ -1,0 +1,15 @@
+NSUT NEST logo/favicon update
+
+Changed files:
+- public/nsutnest-logo.png: replaced with the supplied transparent NSUT NEST logo for the website header/brand component.
+- public/icons/nsutnest-192.png: regenerated 192x192 PWA/browser icon.
+- public/icons/nsutnest-512.png: regenerated 512x512 PWA icon.
+- public/icons/nsutnest-maskable-512.png: regenerated 512x512 maskable PWA icon with extra safe padding.
+- public/sw.js: cache name bumped from nsut-nest-static-v1 to nsut-nest-static-v2 so updated static icons are fetched.
+
+Checked but left unchanged:
+- app/brand-logo.tsx already references /nsutnest-logo.png.
+- app/layout.tsx already points favicon/apple icon metadata to /icons/nsutnest-192.png and /icons/nsutnest-512.png.
+- public/manifest.webmanifest already references the three /icons/ paths.
+
+No other application logic was changed. Commit/push these files to trigger Vercel deployment. If your browser still shows an old favicon, hard-refresh or close/reopen the tab after deployment.

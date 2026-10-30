@@ -634,40 +634,24 @@ body{
 @media(max-width:600px){.imsGateCard{padding:22px 18px;border-radius:17px}.imsGateCard h2{font-size:23px}.imsOptionalRow{grid-template-columns:1fr 1fr;gap:8px}.imsLoggedInBanner{left:10px;right:10px;top:10px;flex-wrap:wrap}.imsSessionButton{font-size:10px}.imsCaptchaImage{min-height:64px}.imsGateCard input,.imsGateCard select{font-size:16px}}
 
 
-/* ---- Placement dataset browser ---- */
+/* ---- Placement dataset: coming soon placeholder ---- */
 .tnpOpportunities{margin:18px 0 24px}
 .tnpOpportunityHead{display:flex;justify-content:space-between;align-items:flex-start;gap:18px;flex-wrap:wrap}
 .tnpOpportunityHead h2{font:600 22px 'Sora',sans-serif;margin:8px 0 5px;letter-spacing:-.025em}
 .tnpOpportunityHead p{color:#8b97a3;font-size:12.5px;margin:0;line-height:1.55}
 .tnpResultCount{border:1px solid #26333c;background:#111a20;color:#a8eac3;border-radius:999px;padding:8px 12px;font-size:11px;white-space:nowrap}
-.tnpFilters{display:grid;grid-template-columns:minmax(220px,1fr) minmax(150px,210px) minmax(150px,210px);gap:10px;margin:22px 0 12px}
-.tnpSearch,.tnpSelectLabel{display:flex;align-items:center;gap:9px;min-width:0;border:1px solid #29333d;border-radius:10px;background:#0a1016;color:#82909e;padding:0 12px;min-height:43px}
-.tnpSearch input,.tnpSelectLabel select{width:100%;min-width:0;background:transparent;border:0;outline:0;color:#e5ebf1;font-size:12px;height:41px}
-.tnpSearch input::placeholder{color:#667584}
-.tnpSelectLabel select option{background:#111820;color:#e5ebf1}
-.tnpOpportunityList{display:flex;flex-direction:column}
-.tnpOpportunity{display:flex;justify-content:space-between;align-items:flex-start;gap:18px;padding:18px 2px;border-top:1px solid #202833}
-.tnpOpportunityMain{min-width:0;flex:1}
-.tnpCompanyLine{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
-.tnpCompanyLine h3{font:600 14px 'Sora',sans-serif;margin:0;color:#f0f4f7}
-.tnpType{display:inline-flex;border:1px solid #314139;background:#102219;color:#8fe5b2;padding:3px 7px;border-radius:6px;font-size:9px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
-.tnpType.internship{border-color:#34415b;background:#151d30;color:#a6b9ff}
-.tnpRole{font-size:12px;line-height:1.6;color:#b4c0cb;margin:7px 0 9px;overflow-wrap:anywhere;white-space:pre-line}
-.tnpMeta{display:flex;gap:8px 14px;flex-wrap:wrap;color:#788897;font-size:10.5px}
-.tnpMeta span{display:inline-flex;align-items:center;gap:5px}
-.tnpMeta svg{flex-shrink:0;color:#657989}
-.tnpBranches,.tnpStipendInfo{font-size:10.5px;line-height:1.65;color:#7e8b98;margin:9px 0 0;white-space:pre-line;overflow-wrap:anywhere}
-.tnpBranches b{color:#aab6c1;font-weight:600}
-.tnpStipendInfo{border-left:2px solid #293a32;padding-left:9px;color:#a6b4bd}
-.tnpPay{flex:0 0 auto;min-width:120px;text-align:right;padding:8px 10px;border:1px solid #26352e;background:#101a15;border-radius:10px}
-.tnpPay small{display:block;color:#71857a;font-size:9px;max-width:130px;line-height:1.4}
-.tnpPay b{display:block;color:#9ce8b9;font:600 15px 'Sora',sans-serif;margin-top:5px}
-.tnpNoResults,.tnpLoadError{padding:18px;border:1px dashed #303a45;border-radius:10px;color:#9aa8b5;font-size:12px;margin:12px 0}
-.tnpLoadError{border-color:#754c42;color:#ffb2a0}
-.tnpLimitNote,.tnpDatasetNote{color:#6f7d8c;font-size:10.5px;line-height:1.65;margin:14px 0 0}
-.tnpDatasetNote{border-top:1px solid #202833;padding-top:13px}
-@media(max-width:760px){.tnpFilters{grid-template-columns:1fr}.tnpOpportunity{gap:10px}.tnpPay{min-width:95px;padding:7px}.tnpPay b{font-size:13px}}
-@media(max-width:480px){.tnpOpportunity{flex-direction:column}.tnpPay{text-align:left;min-width:0}.tnpPay small{max-width:none}.tnpMeta{gap:7px 11px}}
+.tnpSoon{position:relative;overflow:hidden;margin:22px 0 0;border:1px solid #232b36;border-radius:16px;min-height:300px;display:flex;align-items:flex-end;background:#0b1116}
+.tnpSoonImg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:blur(14px) saturate(.9) brightness(.72);transform:scale(1.22)}
+.tnpSoonScrim{position:absolute;inset:0;background:linear-gradient(180deg,rgba(8,12,16,.3) 0%,rgba(8,12,16,.66) 55%,rgba(8,12,16,.88) 100%)}
+.tnpSoonBody{position:relative;padding:34px 30px 30px;max-width:62ch}
+.tnpSoonBadge{display:inline-flex;align-items:center;gap:7px;border:1px solid #3a4a58;background:rgba(17,24,31,.8);color:#a8eac3;border-radius:999px;padding:7px 13px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+.tnpSoonBadge::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 0 4px rgba(143,229,178,.14)}
+.tnpSoonBody h3{font:700 clamp(20px,2.6vw,30px)/1.2 'Sora',sans-serif;letter-spacing:-.03em;margin:16px 0 8px;color:#f2f6f9}
+.tnpSoonBody p{color:#9fb0be;font-size:13px;line-height:1.65;margin:0}
+.tnpSoonCta{display:inline-flex;align-items:center;gap:7px;margin-top:18px;color:#0b1116;background:var(--green);border-radius:10px;padding:11px 17px;font-size:12.5px;font-weight:700;text-decoration:none;transition:.2s}
+.tnpSoonCta:hover{filter:brightness(1.08);transform:translateY(-1px)}
+.tnpDatasetNote{color:#6f7d8c;font-size:10.5px;line-height:1.65;margin:14px 0 0;border-top:1px solid #202833;padding-top:13px}
+@media(max-width:640px){.tnpSoon{min-height:260px}.tnpSoonBody{padding:26px 20px 22px}}
 
 
 /* Installable PWA controls */
