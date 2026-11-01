@@ -14,6 +14,8 @@ export type ImsHttpSession = {
   loginMethod?: 'get' | 'post';
   loginFields?: Record<string, string>;
   navigationUrls?: string[];
+  /** Authenticated My Profile link, captured at login for the profile route. */
+  profileUrl?: string;
   studentRoll?: string;
   academicYearValue?: string;
   semesterValue?: string;

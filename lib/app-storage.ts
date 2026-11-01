@@ -9,6 +9,8 @@
 export const APP_NAME = "NsutNest";
 export const ATTENDANCE_STORAGE_KEY = "nsutnest_ims_attendance";
 export const ATTENDANCE_SYNC_EVENT = "nsutnest-ims-attendance";
+export const PROFILE_STORAGE_KEY = "nsutnest_ims_profile";
+export const PROFILE_SYNC_EVENT = "nsutnest-ims-profile";
 export const ATTENDANCE_REFRESH_EVENT = "nsutnest-ims-refresh-request";
 export const ATTENDANCE_REFRESH_STATUS_EVENT = "nsutnest-ims-refresh-status";
 export const REMEMBERED_IMS_ROLL_KEY = "nsutnest_ims_roll";
@@ -78,6 +80,49 @@ export function clearStoredAttendance(): void {
 /** Tells every mounted page that the stored attendance changed. */
 export function notifyAttendanceSync(): void {
   if (typeof window !== "undefined") window.dispatchEvent(new Event(ATTENDANCE_SYNC_EVENT));
+}
+
+/**
+ * The IMS profile and photograph, cached so the sidebar avatar survives page
+ * navigation without another IMS round-trip. The photo is a data URL returned by
+ * the server; the browser never receives IMS cookies. Cleared on logout.
+ */
+export type StoredImsProfile = {
+  studentId: string;
+  name: string;
+  roll: string;
+  photo: string | null;
+  fields: { label: string; value: string }[];
+  fetchedAt: string;
+};
+
+export function readStoredProfile(): string | null {
+  try {
+    return store("local")?.getItem(PROFILE_STORAGE_KEY) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export function writeStoredProfile(value: string): void {
+  try {
+    store("local")?.setItem(PROFILE_STORAGE_KEY, value);
+  } catch {
+    // A full quota must not stop the profile page from rendering this visit.
+  }
+}
+
+export function clearStoredProfile(): void {
+  try {
+    store("local")?.removeItem(PROFILE_STORAGE_KEY);
+  } catch {
+    // Nothing stored means nothing to clear.
+  }
+}
+
+/** Tells the sidebar and profile page that the cached profile changed. */
+export function notifyProfileSync(): void {
+  if (typeof window !== "undefined") window.dispatchEvent(new Event(PROFILE_SYNC_EVENT));
 }
 
 /**

@@ -27,7 +27,10 @@ export type SafeUpstreamError = { message: string; status: number };
  * Never include the original text: it can contain portal HTML, status codes or
  * internal route names.
  */
-export function safeUpstreamError(error: unknown): SafeUpstreamError {
+export function safeUpstreamError(
+  error: unknown,
+  fallback = 'Could not load attendance right now. Please try again.',
+): SafeUpstreamError {
   const text = error instanceof Error ? error.message : '';
 
   if (/timed out|timeout|aborted|AbortError/i.test(text)) {
@@ -53,5 +56,5 @@ export function safeUpstreamError(error: unknown): SafeUpstreamError {
   if (/CAPTCHA image|CAPTCHA/i.test(text)) {
     return { message: 'The IMS CAPTCHA could not be loaded. Press Refresh to try again.', status: 502 };
   }
-  return { message: 'Could not load attendance right now. Please try again.', status: 502 };
+  return { message: fallback, status: 502 };
 }

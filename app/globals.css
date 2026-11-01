@@ -634,24 +634,40 @@ body{
 @media(max-width:600px){.imsGateCard{padding:22px 18px;border-radius:17px}.imsGateCard h2{font-size:23px}.imsOptionalRow{grid-template-columns:1fr 1fr;gap:8px}.imsLoggedInBanner{left:10px;right:10px;top:10px;flex-wrap:wrap}.imsSessionButton{font-size:10px}.imsCaptchaImage{min-height:64px}.imsGateCard input,.imsGateCard select{font-size:16px}}
 
 
-/* ---- Placement dataset: coming soon placeholder ---- */
+/* ---- Placement dataset browser ---- */
 .tnpOpportunities{margin:18px 0 24px}
 .tnpOpportunityHead{display:flex;justify-content:space-between;align-items:flex-start;gap:18px;flex-wrap:wrap}
 .tnpOpportunityHead h2{font:600 22px 'Sora',sans-serif;margin:8px 0 5px;letter-spacing:-.025em}
 .tnpOpportunityHead p{color:#8b97a3;font-size:12.5px;margin:0;line-height:1.55}
 .tnpResultCount{border:1px solid #26333c;background:#111a20;color:#a8eac3;border-radius:999px;padding:8px 12px;font-size:11px;white-space:nowrap}
-.tnpSoon{position:relative;overflow:hidden;margin:22px 0 0;border:1px solid #232b36;border-radius:16px;min-height:300px;display:flex;align-items:flex-end;background:#0b1116}
-.tnpSoonImg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:blur(14px) saturate(.9) brightness(.72);transform:scale(1.22)}
-.tnpSoonScrim{position:absolute;inset:0;background:linear-gradient(180deg,rgba(8,12,16,.3) 0%,rgba(8,12,16,.66) 55%,rgba(8,12,16,.88) 100%)}
-.tnpSoonBody{position:relative;padding:34px 30px 30px;max-width:62ch}
-.tnpSoonBadge{display:inline-flex;align-items:center;gap:7px;border:1px solid #3a4a58;background:rgba(17,24,31,.8);color:#a8eac3;border-radius:999px;padding:7px 13px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
-.tnpSoonBadge::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 0 4px rgba(143,229,178,.14)}
-.tnpSoonBody h3{font:700 clamp(20px,2.6vw,30px)/1.2 'Sora',sans-serif;letter-spacing:-.03em;margin:16px 0 8px;color:#f2f6f9}
-.tnpSoonBody p{color:#9fb0be;font-size:13px;line-height:1.65;margin:0}
-.tnpSoonCta{display:inline-flex;align-items:center;gap:7px;margin-top:18px;color:#0b1116;background:var(--green);border-radius:10px;padding:11px 17px;font-size:12.5px;font-weight:700;text-decoration:none;transition:.2s}
-.tnpSoonCta:hover{filter:brightness(1.08);transform:translateY(-1px)}
-.tnpDatasetNote{color:#6f7d8c;font-size:10.5px;line-height:1.65;margin:14px 0 0;border-top:1px solid #202833;padding-top:13px}
-@media(max-width:640px){.tnpSoon{min-height:260px}.tnpSoonBody{padding:26px 20px 22px}}
+.tnpFilters{display:grid;grid-template-columns:minmax(220px,1fr) minmax(150px,210px) minmax(150px,210px);gap:10px;margin:22px 0 12px}
+.tnpSearch,.tnpSelectLabel{display:flex;align-items:center;gap:9px;min-width:0;border:1px solid #29333d;border-radius:10px;background:#0a1016;color:#82909e;padding:0 12px;min-height:43px}
+.tnpSearch input,.tnpSelectLabel select{width:100%;min-width:0;background:transparent;border:0;outline:0;color:#e5ebf1;font-size:12px;height:41px}
+.tnpSearch input::placeholder{color:#667584}
+.tnpSelectLabel select option{background:#111820;color:#e5ebf1}
+.tnpOpportunityList{display:flex;flex-direction:column}
+.tnpOpportunity{display:flex;justify-content:space-between;align-items:flex-start;gap:18px;padding:18px 2px;border-top:1px solid #202833}
+.tnpOpportunityMain{min-width:0;flex:1}
+.tnpCompanyLine{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.tnpCompanyLine h3{font:600 14px 'Sora',sans-serif;margin:0;color:#f0f4f7}
+.tnpType{display:inline-flex;border:1px solid #314139;background:#102219;color:#8fe5b2;padding:3px 7px;border-radius:6px;font-size:9px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+.tnpType.internship{border-color:#34415b;background:#151d30;color:#a6b9ff}
+.tnpRole{font-size:12px;line-height:1.6;color:#b4c0cb;margin:7px 0 9px;overflow-wrap:anywhere;white-space:pre-line}
+.tnpMeta{display:flex;gap:8px 14px;flex-wrap:wrap;color:#788897;font-size:10.5px}
+.tnpMeta span{display:inline-flex;align-items:center;gap:5px}
+.tnpMeta svg{flex-shrink:0;color:#657989}
+.tnpBranches,.tnpStipendInfo{font-size:10.5px;line-height:1.65;color:#7e8b98;margin:9px 0 0;white-space:pre-line;overflow-wrap:anywhere}
+.tnpBranches b{color:#aab6c1;font-weight:600}
+.tnpStipendInfo{border-left:2px solid #293a32;padding-left:9px;color:#a6b4bd}
+.tnpPay{flex:0 0 auto;min-width:120px;text-align:right;padding:8px 10px;border:1px solid #26352e;background:#101a15;border-radius:10px}
+.tnpPay small{display:block;color:#71857a;font-size:9px;max-width:130px;line-height:1.4}
+.tnpPay b{display:block;color:#9ce8b9;font:600 15px 'Sora',sans-serif;margin-top:5px}
+.tnpNoResults,.tnpLoadError{padding:18px;border:1px dashed #303a45;border-radius:10px;color:#9aa8b5;font-size:12px;margin:12px 0}
+.tnpLoadError{border-color:#754c42;color:#ffb2a0}
+.tnpLimitNote,.tnpDatasetNote{color:#6f7d8c;font-size:10.5px;line-height:1.65;margin:14px 0 0}
+.tnpDatasetNote{border-top:1px solid #202833;padding-top:13px}
+@media(max-width:760px){.tnpFilters{grid-template-columns:1fr}.tnpOpportunity{gap:10px}.tnpPay{min-width:95px;padding:7px}.tnpPay b{font-size:13px}}
+@media(max-width:480px){.tnpOpportunity{flex-direction:column}.tnpPay{text-align:left;min-width:0}.tnpPay small{max-width:none}.tnpMeta{gap:7px 11px}}
 
 
 /* Installable PWA controls */
@@ -785,3 +801,98 @@ body{
 .attSpinIcon{animation:attSpin 1s linear infinite}
 @keyframes attSpin{to{transform:rotate(360deg)}}
 .attRefreshButton:disabled{opacity:.7;cursor:wait}
+
+/* ---- My Profile (/profile): the read-only IMS profile ---- */
+.hubUserLink{text-decoration:none;color:inherit;border:1px solid transparent;border-radius:12px;padding:7px;margin:-7px;transition:.18s}
+.hubUserLink:hover{background:#141a22;border-color:#233240}
+.hubUserAvatar{overflow:hidden}
+.hubUserAvatar img{display:block;width:100%;height:100%;object-fit:cover;border-radius:50%}
+.hubTopbarProfile{display:none}
+@media(max-width:640px){
+  .hubTopbarProfile{display:grid;place-items:center;width:34px;height:34px;flex:0 0 34px;border-radius:50%;overflow:hidden;background:linear-gradient(135deg,#ff9d6d,#f2705c);color:#401509;font:700 11px 'Sora',sans-serif;text-decoration:none}
+  .hubTopbarProfile img{display:block;width:100%;height:100%;object-fit:cover}
+  .hubTopbarProfile span{line-height:1}
+}
+
+.myProfilePage{width:100%;max-width:980px;margin:0 auto}
+.myProfileToolbar{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;margin-bottom:24px}
+.myProfileKicker{display:block;font-size:10px;letter-spacing:.2em;color:#6f7d8c;font-weight:700}
+.myProfileToolbar h1{font:700 clamp(28px,4vw,42px)/1.1 'Sora',sans-serif;letter-spacing:-.045em;margin:10px 0 7px}
+.myProfileToolbar p{color:#8b97a3;font-size:13.5px;line-height:1.55;margin:0;max-width:62ch}
+.myProfileActions{display:flex;align-items:center;gap:9px;flex-shrink:0}
+.myProfilePrintButton{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:41px;border-radius:10px;padding:10px 15px;font:600 12.5px 'Plus Jakarta Sans',sans-serif;cursor:pointer;transition:.18s;white-space:nowrap;background:var(--green);border:1px solid var(--green);color:#03140c;box-shadow:0 12px 30px -20px rgba(75,224,145,.8)}
+.myProfilePrintButton:hover:not(:disabled){filter:brightness(1.07)}
+.myProfilePrintButton:disabled{opacity:.55;cursor:not-allowed}
+
+.myProfileAlert{display:flex;align-items:flex-start;gap:12px;margin-bottom:18px;padding:14px 16px;border:1px solid #5b3d23;border-radius:12px;background:#19130d;color:#eac6a6;font-size:12px;line-height:1.5}
+.myProfileAlert>svg{flex-shrink:0;margin-top:1px;color:#ff9d6d}
+.myProfileAlert>div:nth-child(2){min-width:0;flex:1}
+.myProfileAlert b{display:block;color:#ffe2c8;font-size:12.5px;margin-bottom:2px}
+.myProfileAlert span{display:block;color:#c9a98e}
+.myProfileAlertActions{display:flex;gap:7px;flex-shrink:0}
+.myProfileAlertActions button{border:1px solid #62472f;border-radius:8px;background:#241a11;color:#ffd9b8;padding:7px 10px;font:600 11px 'Plus Jakarta Sans',sans-serif;cursor:pointer;white-space:nowrap}
+.myProfileAlertActions button:hover{background:#302216}
+
+.myProfileLoading{min-height:360px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;border:1px solid #222b35;border-radius:18px;background:#0d1219;text-align:center;padding:30px}
+.myProfileLoading svg{color:var(--green);margin-bottom:3px}
+.myProfileLoading b{font:600 15px 'Sora',sans-serif;color:#eef3f8}
+.myProfileLoading span{font-size:12px;color:#7f8b97}
+.myProfileEmpty{min-height:360px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;border:1px dashed #2a3743;border-radius:18px;background:#0d1219;text-align:center;padding:34px}
+.myProfileEmptyIcon{display:grid;place-items:center;width:64px;height:64px;border-radius:50%;margin-bottom:8px;background:#14231f;color:var(--green)}
+.myProfileEmpty h2{font:600 20px 'Sora',sans-serif;margin:0}
+.myProfileEmpty p{max-width:44ch;margin:0;color:#8b97a3;font-size:12.5px;line-height:1.6}
+.myProfileEmpty button{margin-top:12px;border:1px solid var(--green);border-radius:9px;background:var(--green);color:#03140c;padding:10px 14px;font:700 12px 'Plus Jakarta Sans',sans-serif;cursor:pointer}
+
+.myProfileSheet{position:relative;overflow:hidden;border:1px solid #26313d;border-radius:20px;background:linear-gradient(180deg,#10161e,#0b1016);padding:30px 32px 20px;box-shadow:0 26px 75px -42px rgba(0,0,0,.95)}
+.myProfileSheet::before{content:"";position:absolute;top:0;bottom:0;left:0;width:3px;background:linear-gradient(180deg,var(--green),rgba(75,224,145,0) 72%)}
+.myProfileSheetHead{display:flex;align-items:center;gap:24px;padding-bottom:24px;border-bottom:1px solid #222b35}
+.myProfilePhoto{display:grid;place-items:center;width:112px;height:112px;flex:0 0 112px;overflow:hidden;border:1px solid #3a4654;border-radius:18px;background:linear-gradient(135deg,#ff9d6d,#f2705c);box-shadow:0 14px 32px -20px rgba(0,0,0,.95)}
+.myProfilePhoto img{display:block;width:100%;height:100%;object-fit:cover}
+.myProfilePhoto span{font:700 31px 'Sora',sans-serif;letter-spacing:-.04em;color:#401509}
+.myProfileIdentity{min-width:0;flex:1}
+.myProfileIdentity>small{display:block;font-size:9px;letter-spacing:.16em;color:#63dca5;font-weight:700}
+.myProfileIdentity h2{font:700 clamp(23px,3vw,30px)/1.15 'Sora',sans-serif;letter-spacing:-.035em;margin:8px 0 5px;overflow-wrap:anywhere}
+.myProfileIdentity p{font:12px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#8b97a3;margin:0;overflow-wrap:anywhere}
+.myProfileChips{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+.myProfileChips span{font-size:10px;font-weight:600;color:#a7e9c5;background:#10241a;border:1px solid #1e3d2c;border-radius:999px;padding:5px 9px}
+.myProfileSectionLabel{margin-top:22px;font-size:9.5px;letter-spacing:.2em;color:#5f6d7c;font-weight:700}
+.myProfileDetails{margin:11px 0 0}
+.myProfileDetailRow{display:grid;grid-template-columns:185px minmax(0,1fr);align-items:baseline;gap:18px;padding:10px 2px;border-bottom:1px solid #1b232d}
+.myProfileDetailRow:last-child{border-bottom:0}
+.myProfileDetailRow dt{font-size:11.5px;font-weight:700;color:#8b97a3;text-align:right}
+.myProfileDetailRow dd{font-size:13.5px;color:#eef3f8;margin:0;overflow-wrap:anywhere}
+@media(max-width:720px){
+  .myProfileToolbar{flex-direction:column;align-items:flex-start;gap:16px}
+  .myProfileActions{width:100%}
+  .myProfileActions button{flex:1}
+  .myProfileSheet{padding:22px 18px 16px;border-radius:16px}
+  .myProfileSheetHead{flex-wrap:wrap;gap:16px}
+  .myProfilePhoto{width:88px;height:88px;flex-basis:88px;border-radius:14px}
+  .myProfilePhoto span{font-size:25px}
+  .myProfileIdentity h2{font-size:22px}
+  .myProfileDetailRow{grid-template-columns:1fr;gap:3px}
+  .myProfileDetailRow dt{text-align:left;font-size:10px;letter-spacing:.08em;text-transform:uppercase}
+  .myProfileAlert{flex-wrap:wrap}
+  .myProfileAlertActions{margin-left:0;width:100%}
+}
+
+/* Clean A4 print: only the profile sheet, on white, with the real photograph. */
+@media print{
+  @page{size:A4 portrait;margin:14mm}
+  html,body{background:#fff!important;color:#111!important}
+  .hubSidebar,.hubTopbar,.mobileBottomNav,.imsSessionButton,.imsLoggedInBanner,.imsGateBackdrop,.pwaInstallButton,.myProfileToolbar,.myProfileAlert,.myProfileLoading,.myProfileEmpty{display:none!important}
+  .hub,.hubMain,.hubContent{display:block!important;margin:0!important;padding:0!important;max-width:none!important;width:auto!important;background:#fff!important;min-height:0!important}
+  .myProfilePage{max-width:none!important;margin:0!important;padding:0!important}
+  .myProfileSheet{border:1px solid #c9d0d7!important;border-radius:0!important;background:#fff!important;color:#111!important;padding:12mm!important;box-shadow:none!important;break-inside:avoid}
+  .myProfileSheet::before{display:none!important}
+  .myProfileSheetHead{border-bottom:1px solid #c9d0d7!important;padding-bottom:7mm!important}
+  .myProfilePhoto{border:1px solid #c9d0d7!important;background:#f2f4f6!important;box-shadow:none!important}
+  .myProfilePhoto span{color:#333!important}
+  .myProfileIdentity>small{color:#555!important}
+  .myProfileIdentity h2,.myProfileIdentity p{color:#111!important}
+  .myProfileChips span{background:#f2f5f7!important;border:1px solid #c9d0d7!important;color:#333!important}
+  .myProfileSectionLabel{color:#555!important}
+  .myProfileDetailRow{border-bottom:1px solid #dfe4e9!important}
+  .myProfileDetailRow dt{color:#555!important}
+  .myProfileDetailRow dd{color:#111!important}
+}

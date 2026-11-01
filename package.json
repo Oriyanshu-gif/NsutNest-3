@@ -9,6 +9,7 @@
     "data": "node scripts/build-data.mjs",
     "check:ims": "tsc lib/rate-limit.ts lib/ims-auth-errors.ts lib/ims-http.ts scripts/check-ims-auth.ts --outDir .ims-check --module commonjs --moduleResolution node --target es2022 --esModuleInterop --skipLibCheck && node .ims-check/scripts/check-ims-auth.js",
     "check:attendance": "tsc lib/attendance.ts lib/ims-attendance-html.ts lib/ims-attendance-parse.ts app/attendance-calendar.tsx scripts/check-attendance-names.ts scripts/check-attendance-calendar.tsx --outDir .attendance-check --module commonjs --moduleResolution node --target es2022 --jsx react-jsx --esModuleInterop --skipLibCheck && node .attendance-check/scripts/check-attendance-names.js && node .attendance-check/scripts/check-attendance-calendar.js",
+    "check:profile": "tsc lib/ims-profile.ts lib/ims-http.ts scripts/check-ims-profile.ts --outDir .profile-check --module commonjs --moduleResolution node --target es2022 --esModuleInterop --skipLibCheck && node .profile-check/scripts/check-ims-profile.js",
     "predev": "node scripts/build-data.mjs",
     "prebuild": "node scripts/build-data.mjs"
   },

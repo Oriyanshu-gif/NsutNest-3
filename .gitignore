@@ -8,3 +8,4 @@ next-env.d.ts
 # attendance name check build output
 .attendance-check
 .ims-check
+.profile-check

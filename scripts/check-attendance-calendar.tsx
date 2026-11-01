@@ -7,7 +7,7 @@
  * Run with:  npm run check:attendance
  */
 import { renderToStaticMarkup } from 'react-dom/server';
-import { SubjectAttendanceCalendar } from '../app/attendance-calendar';
+import { attendanceDateLabel, SubjectAttendanceCalendar } from '../app/attendance-calendar';
 
 const failures: string[] = [];
 const check = (label: string, ok: boolean, detail = '') => {
@@ -54,7 +54,12 @@ check('no-data days are still rendered', (html.match(/attendanceCalendarDay empt
 check('portal marks appear on their day', html.includes('<small>GH</small>'));
 check('double classes are summarised', html.includes('<small>×2</small>'));
 check('legend explains the portal status marks', html.includes('Gazetted Holiday') && /<b>GH<\/b>/.test(html));
-check('day tooltips describe the record', html.includes('title="Oct 2, 2026 — absent"'));
+// The tooltip names the real date of the selected month and marks today, so the
+// expectation is derived instead of being tied to one calendar month.
+const secondLabel = attendanceDateLabel(`${thisMonth}-02`);
+check('day tooltips describe the record',
+  html.includes(`title="${secondLabel}${todayDay === '02' ? ' · today' : ''} — absent"`),
+  html.match(/title="[^"]*"/g)?.slice(0, 3).join(' | ') ?? '');
 
 // A subject with no records for the selected month explains itself instead of rendering an empty grid.
 const empty = renderToStaticMarkup(

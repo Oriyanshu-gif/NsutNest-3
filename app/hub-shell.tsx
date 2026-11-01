@@ -18,16 +18,22 @@ import {
   ATTENDANCE_REFRESH_EVENT,
   ATTENDANCE_REFRESH_STATUS_EVENT,
   ATTENDANCE_SYNC_EVENT,
+  PROFILE_SYNC_EVENT,
   clearRememberedImsId,
   clearRememberedPassword,
   clearStoredAttendance,
+  clearStoredProfile,
   notifyAttendanceSync,
+  notifyProfileSync,
   readRememberedImsId,
   readRememberedPassword,
   readStoredAttendance,
+  readStoredProfile,
   writeRememberedImsId,
   writeRememberedPassword,
   writeStoredAttendance,
+  writeStoredProfile,
+  type StoredImsProfile,
 } from "../lib/app-storage";
 import { loadStudents } from "../lib/data";
 
@@ -45,6 +51,7 @@ function crumb(pathname: string): string {
   if (pathname.startsWith("/tnp")) return "TNP (Training & Placement)";
   if (pathname.startsWith("/results")) return "Results";
   if (pathname.startsWith("/community")) return "Community";
+  if (pathname.startsWith("/profile")) return "My Profile";
   if (pathname.startsWith("/student")) return "Student profile";
   if (pathname.startsWith("/notices")) return "Notices";
   return pathname;
@@ -68,6 +75,9 @@ type AttendanceApiResponse = LiveAttendance | AttendanceConfirmation | { error?:
 const IMS_SESSION_TTL_SECONDS = 180;
 /** Reuse the shown CAPTCHA only when this many seconds of validity remain. */
 const SESSION_REUSE_MARGIN_SECONDS = 30;
+
+/** One automatic profile fetch per signed-in roll, per page session. */
+const profileFetchAttempts = new Set<string>();
 
 export function ImsLoginGate() {
   const [open, setOpen] = useState(true);
@@ -265,11 +275,15 @@ export function ImsLoginGate() {
 
   function logout() {
     clearStoredAttendance();
-    // Logging out is the "forget me" action: both saved credentials go too.
+    // Logging out is the "forget me" action: saved credentials and the cached
+    // IMS photograph go too.
     clearRememberedImsId();
     clearRememberedPassword();
+    clearStoredProfile();
+    profileFetchAttempts.clear();
     setRememberCredentials(false);
     notifyAttendanceSync();
+    notifyProfileSync();
     setAttendance(null); setRoll(""); setPassword(""); setCaptchaText(""); setConfirmation(null); setSessionId(""); setCaptcha(""); setSyncing(false); setOpen(true); void newCaptcha();
   }
 
@@ -399,6 +413,9 @@ export default function HubShell({ children }: { children: ReactNode }) {
   const pathname = usePathname() ?? "/";
   const activeLabel = crumb(pathname);
   const [loggedInStudent, setLoggedInStudent] = useState<{ name: string; roll: string } | null>(null);
+  const [profile, setProfile] = useState<StoredImsProfile | null>(null);
+  // Bumped by a new IMS sign-in so the photograph fetch can run again.
+  const [profileSyncToken, setProfileSyncToken] = useState(0);
 
   useEffect(() => {
     function syncStudent() {
@@ -437,7 +454,65 @@ export default function HubShell({ children }: { children: ReactNode }) {
     return () => window.removeEventListener(ATTENDANCE_SYNC_EVENT, syncStudent);
   }, []);
 
-  const studentName = loggedInStudent?.name || loggedInStudent?.roll || "Student";
+  // Keep the cached profile in sync with the profile page and logout.
+  useEffect(() => {
+    function syncProfile() {
+      try {
+        const raw = readStoredProfile();
+        const parsed = raw ? JSON.parse(raw) as StoredImsProfile : null;
+        const sameStudent = !parsed?.roll || !loggedInStudent?.roll
+          || parsed.roll.toUpperCase() === loggedInStudent.roll.toUpperCase();
+        setProfile(sameStudent && parsed?.fields?.length ? parsed : null);
+      } catch {
+        setProfile(null);
+      }
+    }
+
+    syncProfile();
+    window.addEventListener(PROFILE_SYNC_EVENT, syncProfile);
+    return () => window.removeEventListener(PROFILE_SYNC_EVENT, syncProfile);
+  }, [loggedInStudent?.roll]);
+
+  // A fresh IMS sign-in may carry a new session, so allow the photograph to be
+  // retried instead of waiting for a page reload.
+  useEffect(() => {
+    const onAttendanceSync = () => {
+      profileFetchAttempts.clear();
+      setProfileSyncToken(token => token + 1);
+    };
+    window.addEventListener(ATTENDANCE_SYNC_EVENT, onAttendanceSync);
+    return () => window.removeEventListener(ATTENDANCE_SYNC_EVENT, onAttendanceSync);
+  }, []);
+
+  // Fetch the photograph once after attendance establishes the IMS session. The
+  // profile page fetches its own copy, so skip the duplicate request there.
+  useEffect(() => {
+    if (!loggedInStudent?.roll || pathname === "/profile") return;
+    if (readStoredProfile()) return;
+    const key = loggedInStudent.roll.toUpperCase();
+    if (profileFetchAttempts.has(key)) return;
+    profileFetchAttempts.add(key);
+
+    fetch("/api/ims/profile", { cache: "no-store" })
+      .then(async response => {
+        const body = await response.json() as StoredImsProfile & { error?: string };
+        if (!response.ok) throw new Error(body.error || "Profile unavailable");
+        return body;
+      })
+      .then(payload => {
+        if (!payload?.fields?.length) return;
+        writeStoredProfile(JSON.stringify(payload));
+        notifyProfileSync();
+      })
+      .catch(() => {
+        // Initials remain in the sidebar; the profile page reports the reason.
+      });
+  }, [loggedInStudent?.roll, pathname, profileSyncToken]);
+
+  // The published student record supplies the title-cased name ("Priyanshu Kumar
+  // Singh") while IMS prints it in capitals; keep the familiar form, and fall
+  // back to the IMS name only when no record is available.
+  const studentName = loggedInStudent?.name?.trim() || profile?.name?.trim() || loggedInStudent?.roll || "Student";
   const nameParts = studentName.split(/\s+/).filter(Boolean);
   const studentInitials = nameParts.length > 1
     ? `${nameParts[0][0]}${nameParts[nameParts.length - 1][0]}`.toUpperCase()
@@ -465,13 +540,17 @@ export default function HubShell({ children }: { children: ReactNode }) {
         </nav>
 
         <div className="hubSidebarFooter">
-          <div className="hubUser">
-            <span className="hubUserAvatar" title={studentName}>{studentInitials}</span>
+          <Link href="/profile" className="hubUser hubUserLink" title={`Open ${studentName}'s My Profile`}>
+            <span className="hubUserAvatar">
+              {profile?.photo
+                ? <img src={profile.photo} alt="" />
+                : studentInitials}
+            </span>
             <span className="hubUserIdentity">
               <b title={studentName}>{studentName}</b>
               <small>NSUT B.Tech</small>
             </span>
-          </div>
+          </Link>
         </div>
       </aside>
 
@@ -493,6 +572,10 @@ export default function HubShell({ children }: { children: ReactNode }) {
           </div>
           <div className="hubTopbarRight">
             <LiveViewCount />
+            {/* The sidebar is hidden on phones, so the profile stays reachable here. */}
+            <Link href="/profile" className="hubTopbarProfile" aria-label="Open My Profile">
+              {profile?.photo ? <img src={profile.photo} alt="" /> : <span>{studentInitials}</span>}
+            </Link>
             <Link href="/notices" className="hubBell" aria-label="IMS notices">
               <Bell size={17} />
               <i className="hubBellDot" />
