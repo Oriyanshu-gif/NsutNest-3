@@ -222,6 +222,27 @@ export function mergeProfileFields(summary: ImsProfileField[], view: ImsProfileF
   return sortFields(merged);
 }
 
+/**
+ * Finds the Print Profile tab inside the My Profile table header. Its link is a
+ * one-time token, so it has to be read from the freshly loaded page.
+ */
+export function findProfilePrintUrl(html: string, pageUrl: string): string | null {
+  const $ = load(html);
+  let href: string | null = null;
+  $('tr.plum_head a, a.plum_button, a').each((_, anchor) => {
+    if (href) return;
+    if (clean($(anchor).text()).toLowerCase() !== 'print profile') return;
+    const candidate = $(anchor).attr('href');
+    if (candidate && !/^javascript:/i.test(candidate)) href = candidate;
+  });
+  if (!href) return null;
+  try {
+    return new URL(href, pageUrl).href;
+  } catch {
+    return null;
+  }
+}
+
 /** Finds the View tab inside the My Profile table header. */
 export function findProfileViewUrl(html: string, pageUrl: string): string | null {
   const $ = load(html);

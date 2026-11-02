@@ -60,6 +60,7 @@ function MyProfileBody() {
   const [error, setError] = useState("");
   const [photoFailed, setPhotoFailed] = useState(false);
   const [reloadToken, setReloadToken] = useState(0);
+  const [openingPrint, setOpeningPrint] = useState(false);
 
   // The cached copy paints immediately, then a fresh request replaces it. This
   // keeps the sidebar photograph and the print sheet instant on every visit.
@@ -119,21 +120,55 @@ function MyProfileBody() {
   const studentInitials = initials(fullName);
   const showPhoto = Boolean(profile?.photo) && !photoFailed;
 
+  // Branch and degree stand alone; the section is just a digit in IMS, so it
+  // needs its label to mean anything outside the table.
   const chips = useMemo(() => {
     if (!profile) return [];
-    return ["branch name", "degree", "section"]
-      .map(key => profile.fields.find(field => field.label.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim() === key))
-      .filter((field): field is { label: string; value: string } => Boolean(field?.value))
-      .map(field => field.value);
+    const pick = (key: string) => profile.fields
+      .find(field => field.label.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim() === key)?.value?.trim();
+    return [pick("branch name"), pick("degree"), pick("section") && `Section ${pick("section")}`]
+      .filter((chip): chip is string => Boolean(chip));
   }, [profile]);
 
   function refresh() {
     setReloadToken(token => token + 1);
   }
 
-  function printProfile() {
+  /**
+   * Opens the portal's own Print Profile page. IMS only serves that link inside
+   * the signed-in session, so the request goes through our API route, which
+   * returns the page HTML (photograph already inlined) for a new tab.
+   */
+  async function printProfile() {
+    if (!profile || openingPrint) return;
+    // Opened during the click so the browser counts it as a user gesture.
+    const printWindow = window.open("", "ims-profile-print", "width=920,height=1040");
+    setOpeningPrint(true);
+    try {
+      const response = await fetch("/api/ims/profile/print", { cache: "no-store" });
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({})) as { error?: string };
+        throw new Error(body.error || "Could not open the IMS printout.");
+      }
+      const html = await response.text();
+      if (!printWindow) throw new Error("Allow pop-ups to open the IMS printout.");
+      const url = URL.createObjectURL(new Blob([html], { type: "text/html" }));
+      printWindow.location.replace(url);
+      printWindow.focus();
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch {
+      // IMS would not hand over its printout, so fall back to the copy already
+      // on this device instead of showing another banner.
+      printWindow?.close();
+      printDeviceCopy();
+    } finally {
+      setOpeningPrint(false);
+    }
+  }
+
+  /** On-device copy: the browser prints the sheet styled by @media print. */
+  function printDeviceCopy() {
     if (!profile) return;
-    // The @media print rules hide the shell and print only .myProfileSheet.
     window.print();
   }
 
@@ -147,17 +182,18 @@ function MyProfileBody() {
           <p>Your details and photograph, straight from IMS.</p>
         </div>
         <div className="myProfileActions">
-          <button className="myProfilePrintButton" type="button" onClick={printProfile} disabled={!profile}>
-            <Printer size={16} /> Print Profile
+          <button className="myProfilePrintButton" type="button" onClick={printProfile} disabled={!profile || openingPrint}>
+            {openingPrint ? <Loader2 size={16} className="attSpinIcon" /> : <Printer size={16} />}
+            {openingPrint ? "Opening IMS printout…" : "Print Profile"}
           </button>
         </div>
       </header>
 
-      {error && (
+      {error && !profile && (
         <div className="myProfileAlert" role="alert">
           <AlertTriangle size={18} />
           <div>
-            <b>{profile ? "Showing your saved IMS profile" : "Could not load your IMS profile"}</b>
+            <b>IMS profile not loaded yet</b>
             <span>{error}</span>
           </div>
           <div className="myProfileAlertActions">
@@ -179,13 +215,20 @@ function MyProfileBody() {
         <div className="myProfileEmpty">
           <span className="myProfileEmptyIcon"><UserRound size={30} /></span>
           <h2>Connect your IMS profile</h2>
-          <p>Sign in to NSUT IMS with the attendance flow and your profile will load here.</p>
-          {error && <button type="button" onClick={requestAttendanceRefresh}>Sign in &amp; sync IMS</button>}
+          <p>Sign in once on the dashboard and your IMS details and photograph appear here.</p>
+          <button type="button" onClick={requestAttendanceRefresh}>Sign in &amp; sync IMS</button>
         </div>
       )}
 
       {profile && (
         <article className="myProfileSheet" id="student-profile-sheet" aria-label="IMS student profile">
+          {/* Print-only letterhead: the IMS printout opens with the institute
+              name and address, so the sheet does not need the app header. */}
+          <header className="myProfilePrintHead" aria-hidden="true">
+            <b>NETAJI SUBHAS UNIVERSITY OF TECHNOLOGY</b>
+            <span>Azad Hind Fauz Marg, New Delhi - 110078</span>
+            <small>Student Profile</small>
+          </header>
           <header className="myProfileSheetHead">
             <div className="myProfilePhoto">
               {showPhoto

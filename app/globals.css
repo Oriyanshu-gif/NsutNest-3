@@ -31,12 +31,13 @@
 .hubBreadcrumb{font-size:13px;color:#76828e}
 .hubBreadcrumb b{color:#fff;font-weight:600}
 .crumbSlash{margin:0 9px;color:#3c4650}
-.hubTopbarRight{display:flex;align-items:center;gap:22px}
+.hubTopbarRight{display:flex;align-items:center;gap:16px;min-width:0}
 .hubBell{position:relative;display:grid;place-items:center;width:38px;height:38px;border-radius:11px;color:#aeb9c4;text-decoration:none;transition:.18s}
 .hubBell:hover{background:#141a22;color:#fff}
-.hubBellDot{position:absolute;top:7px;right:8px;width:7px;height:7px;border-radius:50%;background:#f4a261;border:2px solid #0b0e13}
-.hubSemester{display:flex;align-items:center;gap:9px;color:#aeb9c4;font-size:12.5px}
-.hubSemesterDot{width:8px;height:8px;border-radius:50%;background:var(--green);display:inline-block}
+.hubSemester{display:flex;align-items:center;gap:8px;padding:6px 11px;border:1px solid #233240;border-radius:999px;color:#aeb9c4;font-size:11.5px;white-space:nowrap}
+.hubSemesterDot{width:7px;height:7px;border-radius:50%;background:#5c6a78;display:inline-block}
+.hubSemester.connected{border-color:#254a3a;color:#bfe9d1}
+.hubSemester.connected .hubSemesterDot{background:var(--green);box-shadow:0 0 0 3px rgba(75,224,145,.14)}
 /* "People who have visited so far" counter, shown in the top bar. */
 .liveViews{display:inline-flex;align-items:center;gap:6px;color:#aeb9c4;font-size:12.5px;white-space:nowrap}
 .liveViews svg{color:var(--green)}
@@ -63,7 +64,8 @@
 .rollEdit:hover{text-decoration:underline}
 
 /* ---- Summary cards ---- */
-.summaryCards{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:26px}
+/* auto-fit so the row still fills when the optional visit tile is absent. */
+.summaryCards{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(240px,100%),1fr));gap:16px;margin-bottom:26px}
 .summaryCard{position:relative;overflow:hidden;background:#0d1219;border:1px solid #222a34;border-radius:16px;padding:21px 19px 18px;display:flex;flex-direction:column;text-decoration:none;color:inherit;transition:.2s;min-width:0}
 .summaryCard:hover{transform:translateY(-2px);border-color:#33414f}
 .scIcon{width:38px;height:38px;border-radius:10px;display:grid;place-items:center;margin-bottom:14px}
@@ -88,6 +90,8 @@
 .panelKicker{font-size:10px;letter-spacing:.18em;color:#6f7d8c;font-weight:700;display:block}
 .hubCardHead h2{font:600 21px 'Sora',sans-serif;letter-spacing:-.02em;margin:7px 0 0}
 .policyLink,.panelLink{display:inline-flex;align-items:center;gap:5px;color:var(--green);font-size:12px;text-decoration:none;white-space:nowrap}
+/* Read-only fact, not a link: no underline affordance. */
+.policyTag{display:inline-flex;align-items:center;padding:4px 9px;border:1px solid #26313d;border-radius:999px;color:#9aa7b3;font-size:11px;white-space:nowrap}
 .panelLink:hover,.policyLink:hover{text-decoration:underline}
 /* Refresh ask lives in the attendance panel head, next to the policy note. */
 .attPanelActions{display:flex;align-items:center;justify-content:flex-end;gap:10px;flex-wrap:wrap}
@@ -374,6 +378,8 @@
 .studyCard{display:flex;flex-direction:column;gap:14px}
 .studyCardHead{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;min-width:0}
 .studyCardHead h3{font:600 15px 'Sora',sans-serif;letter-spacing:-.01em;margin:0;min-width:0;overflow-wrap:anywhere}
+.studyCardSoon{display:flex;align-items:center;gap:7px;margin:0;color:#7f8d9a;font-size:11.5px}
+.studyCardSoon svg{flex:0 0 auto;color:#4f6478}
 .studyChips{display:flex;gap:8px;flex-wrap:wrap}
 .studyChip{display:inline-flex;align-items:center;gap:6px;color:#aab4bd;background:#101821;border:1px solid #232b36;border-radius:999px;padding:8px 13px;font-size:11.5px;font-weight:600;text-decoration:none;transition:.18s}
 .studyChip svg{color:#3a4653;transition:.18s}
@@ -389,7 +395,9 @@
 .tnpHeader p{color:#8b97a3;font-size:14px;margin:0;max-width:56ch}
 .tnpSync{flex-shrink:0;display:inline-flex;align-items:center;gap:8px;color:#aeb9c4;font-size:12px;background:#11151c;border:1px solid #232b36;border-radius:999px;padding:9px 15px;white-space:nowrap}
 .tnpSync::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--green)}
-.tnpLinkGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;margin-bottom:16px}
+/* Four links, so the grid is sized to fill a wide row instead of leaving an
+   orphan card on a second line. */
+.tnpLinkGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px;margin-bottom:16px}
 .tnpCard{display:flex;flex-direction:column;gap:9px;color:inherit;text-decoration:none;transition:.2s}
 .tnpCard:hover{transform:translateY(-2px);border-color:#33414f}
 .tnpCardIcon{width:40px;height:40px;border-radius:11px;display:grid;place-items:center;color:#ffe0a3;background:#2a2115}
@@ -405,7 +413,14 @@
 .tnpContactRows svg{color:#4d5a66}
 .tnpContactLink{display:inline-flex;align-items:center;gap:6px;color:var(--green);font-size:12.5px;font-weight:600;text-decoration:none;margin-top:16px}
 .tnpContactLink:hover{text-decoration:underline}
-@media(max-width:640px){.tnpHeader{flex-direction:column;align-items:flex-start}.tnpSync{align-self:flex-start}}
+
+.tnpComingSoon{display:flex;flex-direction:column;align-items:center;text-align:center;gap:8px;margin:18px 0 16px;padding:44px 30px;border-style:dashed;border-color:#2c3a46;background:radial-gradient(120% 140% at 50% 0%,#12211a 0%,#0d1219 58%)}
+.tnpComingSoonIcon{display:grid;place-items:center;width:58px;height:58px;border-radius:16px;margin-bottom:6px;background:#14231f;border:1px solid #234133;color:var(--green)}
+.tnpComingSoon h2{font:600 clamp(22px,3vw,30px)/1.15 'Sora',sans-serif;letter-spacing:-.03em;margin:6px 0 2px;color:#eef3f8}
+.tnpComingSoon>p{max-width:58ch;margin:0;color:#8b97a3;font-size:13px;line-height:1.65}
+.tnpComingSoonMeta{display:flex;flex-wrap:wrap;justify-content:center;gap:7px;margin:14px 0 4px}
+.tnpComingSoonMeta span{border:1px solid #26333c;background:#111a20;color:#a8b6c2;border-radius:999px;padding:6px 11px;font-size:11px}
+@media(max-width:640px){.tnpHeader{flex-direction:column;align-items:flex-start}.tnpSync{align-self:flex-start}.tnpComingSoon{padding:34px 20px}}
 
 
 /* ============================================================ */
@@ -634,7 +649,7 @@ body{
 @media(max-width:600px){.imsGateCard{padding:22px 18px;border-radius:17px}.imsGateCard h2{font-size:23px}.imsOptionalRow{grid-template-columns:1fr 1fr;gap:8px}.imsLoggedInBanner{left:10px;right:10px;top:10px;flex-wrap:wrap}.imsSessionButton{font-size:10px}.imsCaptchaImage{min-height:64px}.imsGateCard input,.imsGateCard select{font-size:16px}}
 
 
-/* ---- Placement dataset browser ---- */
+/* ---- Placement dataset browser (kept for when the dataset returns) ---- */
 .tnpOpportunities{margin:18px 0 24px}
 .tnpOpportunityHead{display:flex;justify-content:space-between;align-items:flex-start;gap:18px;flex-wrap:wrap}
 .tnpOpportunityHead h2{font:600 22px 'Sora',sans-serif;margin:8px 0 5px;letter-spacing:-.025em}
@@ -784,11 +799,17 @@ body{
   }
   /* Reserve space below the header so the identity chip covers no content. */
   .hubContent { padding-top: 72px; }
-  /* Override the earlier 600px install-button rule, which put it over tabs. */
+  /* Override the earlier 600px install-button rule, which put it over tabs.
+     Icon-only on phones so it stops covering card text. */
   .pwaInstallButton {
     bottom: calc(86px + env(safe-area-inset-bottom, 0px));
     right: 12px;
+    width: 44px; height: 44px; padding: 0;
+    justify-content: center;
   }
+  .pwaInstallButton span { display: none; }
+  /* The floating IMS chip already shows the roll number and sync state. */
+  .rollCard { display: none; }
 }
 
 /* Visible loading state over the attendance card while IMS refresh runs. */
@@ -876,8 +897,15 @@ body{
   .myProfileAlertActions{margin-left:0;width:100%}
 }
 
+/* Letterhead shown only on the printed sheet. */
+.myProfilePrintHead{display:none}
+
 /* Clean A4 print: only the profile sheet, on white, with the real photograph. */
 @media print{
+  .myProfilePrintHead{display:block!important;text-align:center;margin:0 0 8mm;padding-bottom:6mm;border-bottom:2px solid #111}
+  .myProfilePrintHead b{display:block;font:700 15pt 'Sora',sans-serif;letter-spacing:.02em;color:#111}
+  .myProfilePrintHead span{display:block;margin-top:2mm;font-size:9pt;color:#444}
+  .myProfilePrintHead small{display:inline-block;margin-top:5mm;padding:1.5mm 4mm;border:1px solid #111;border-radius:2mm;font-size:8.5pt;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#111}
   @page{size:A4 portrait;margin:14mm}
   html,body{background:#fff!important;color:#111!important}
   .hubSidebar,.hubTopbar,.mobileBottomNav,.imsSessionButton,.imsLoggedInBanner,.imsGateBackdrop,.pwaInstallButton,.myProfileToolbar,.myProfileAlert,.myProfileLoading,.myProfileEmpty{display:none!important}
@@ -888,7 +916,8 @@ body{
   .myProfileSheetHead{border-bottom:1px solid #c9d0d7!important;padding-bottom:7mm!important}
   .myProfilePhoto{border:1px solid #c9d0d7!important;background:#f2f4f6!important;box-shadow:none!important}
   .myProfilePhoto span{color:#333!important}
-  .myProfileIdentity>small{color:#555!important}
+  /* The letterhead already names the university; avoid printing it twice. */
+  .myProfileIdentity>small{display:none!important}
   .myProfileIdentity h2,.myProfileIdentity p{color:#111!important}
   .myProfileChips span{background:#f2f5f7!important;border:1px solid #c9d0d7!important;color:#333!important}
   .myProfileSectionLabel{color:#555!important}
