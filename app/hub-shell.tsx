@@ -70,6 +70,7 @@ type AttendanceConfirmation = {
   message: string;
 };
 type AttendanceApiResponse = LiveAttendance | AttendanceConfirmation | { error?: string };
+type RefreshApiResponse = Partial<LiveAttendance> & Partial<AttendanceConfirmation> & { error?: string; needsLogin?: boolean };
 
 /** Server-side CAPTCHA session lifetime, in seconds (lib/ims-http.ts IMS_SESSION_SECONDS). */
 const IMS_SESSION_TTL_SECONDS = 180;
@@ -86,6 +87,11 @@ export function ImsLoginGate() {
   const [roll, setRoll] = useState("");
   /** One switch for both saved credentials, so the pair can never drift apart. */
   const [rememberCredentials, setRememberCredentials] = useState(false);
+  /**
+   * Whether both an ID and a password are stored on this device. When they are,
+   * the gate asks only for the CAPTCHA; the saved pair is submitted behind it.
+   */
+  const [savedCredentials, setSavedCredentials] = useState(false);
   const [password, setPassword] = useState("");
   const [captchaText, setCaptchaText] = useState("");
   const [confirmation, setConfirmation] = useState<AttendanceConfirmation | null>(null);
@@ -98,6 +104,8 @@ export function ImsLoginGate() {
   const [attendance, setAttendance] = useState<LiveAttendance | null>(null);
   /** True while re-running sign-in to refresh a snapshot that is already saved. */
   const [syncing, setSyncing] = useState(false);
+  /** Why the card is open; only the copy differs between a refresh and a print. */
+  const [signInPurpose, setSignInPurpose] = useState<"refresh" | "print">("refresh");
   /**
    * Whether IMS requires a human-read CAPTCHA. Always true today: the portal has
    * no sanctioned API or authorised automated verification. The flag comes from
@@ -131,6 +139,7 @@ export function ImsLoginGate() {
     if (savedId) setRoll(savedId);
     if (savedPassword) setPassword(savedPassword);
     setRememberCredentials(Boolean(savedId || savedPassword));
+    setSavedCredentials(Boolean(savedId && savedPassword));
   }, []);
 
   // Refresh before expiry while the user is filling out the form, rather than
@@ -208,6 +217,7 @@ export function ImsLoginGate() {
       clearRememberedPassword();
     }
     setRememberCredentials(remember);
+    setSavedCredentials(remember && Boolean(roll.trim()) && Boolean(password));
   }
 
   async function submit(e: FormEvent) {
@@ -282,46 +292,81 @@ export function ImsLoginGate() {
     clearStoredProfile();
     profileFetchAttempts.clear();
     setRememberCredentials(false);
+    setSavedCredentials(false);
     notifyAttendanceSync();
     notifyProfileSync();
     setAttendance(null); setRoll(""); setPassword(""); setCaptchaText(""); setConfirmation(null); setSessionId(""); setCaptcha(""); setSyncing(false); setOpen(true); void newCaptcha();
   }
 
-  /** Refresh attendance using the existing authenticated IMS session first. */
+  /**
+   * Refresh attendance in the order that asks the student for the least work:
+   *
+   *   1. Reuse the stored IMS session — no CAPTCHA, no password.
+   *   2. If IMS no longer accepts that session, ask only for the CAPTCHA. The ID
+   *      and password saved on this device are submitted with it, so a remembered
+   *      student never retypes credentials to refresh.
+   *   3. With nothing saved, fall back to the full sign-in form.
+   *
+   * Every failure ends in step 2 or 3, so the button can never look dead.
+   */
   async function startResync() {
     if (syncing) return;
-    setError("");
+    let failure = "";
     window.dispatchEvent(new CustomEvent(ATTENDANCE_REFRESH_STATUS_EVENT, { detail: true }));
     try {
       const res = await fetch("/api/ims/refresh", { method: "POST", cache: "no-store" });
-      const body = await res.json();
+      const body = (await res.json().catch(() => ({}))) as RefreshApiResponse;
       if (res.ok && Array.isArray(body.subjects) && body.subjects.length) {
         const payload = { ...body, subjects: withResolvedSubjectNames(body.subjects) } as LiveAttendance;
         writeStoredAttendance(JSON.stringify(payload));
         notifyAttendanceSync();
         setAttendance(payload);
+        setError("");
         setSyncing(false);
         setOpen(false);
         return;
       }
-      if (res.status !== 401) {
-        setError(body.error || "Could not refresh attendance. Please try again.");
-        setSyncing(false);
+      if (res.ok && body.needsConfirmation) {
+        // The portal moved to a new academic year or semester: ask for the pair
+        // rather than throwing a usable session away.
+        const confirmationBody = body as AttendanceConfirmation;
+        setConfirmation(confirmationBody);
+        setSessionId(confirmationBody.sessionId);
+        setConfirmedYear(confirmationBody.suggested.academicYear);
+        setConfirmedSemester(confirmationBody.suggested.semester);
+        setSyncing(true);
+        setCaptchaText("");
         return;
       }
-      // IMS has actually expired: only now require a fresh login/CAPTCHA.
-      setSyncing(true);
-      setConfirmation(null);
-      setPassword(readRememberedPassword() ?? "");
-      setCaptchaText("");
-      setError("Your IMS session has expired. Sign in again to refresh attendance.");
-      await newCaptcha(true);
+      if (body.error) failure = body.error;
     } catch {
-      setError("Could not reach IMS. Your saved attendance is still available.");
-      setSyncing(false);
+      // The request never reached the server; step 2 reports it below.
     } finally {
+      // The panel's "Updating attendance…" overlay must clear on every outcome,
+      // including the early returns above.
       window.dispatchEvent(new CustomEvent(ATTENDANCE_REFRESH_STATUS_EVENT, { detail: false }));
     }
+
+    const savedId = readRememberedImsId() ?? "";
+    const savedPassword = readRememberedPassword() ?? "";
+    setSyncing(true);
+    setConfirmation(null);
+    setCaptchaText("");
+    // Prefill from this device. Saving them is the student's own consent from the
+    // sign-in card, and logging out still erases them.
+    if (savedId) setRoll(savedId);
+    setPassword(savedPassword);
+    setError(failure || "Your saved IMS session expired. Enter the CAPTCHA to refresh attendance.");
+    await newCaptcha(true);
+  }
+
+  /** Drops the saved ID and password so the next sign-in starts blank. */
+  function useDifferentAccount() {
+    updateRememberCredentials(false);
+    setRoll("");
+    setPassword("");
+    setCaptchaText("");
+    setError("");
   }
 
   function cancelResync() {
@@ -340,7 +385,10 @@ export function ImsLoginGate() {
   const resyncRef = useRef(startResync);
   resyncRef.current = startResync;
   useEffect(() => {
-    const onRequest = () => {
+    const onRequest = (event: Event) => {
+      // "print" only changes the wording: the profile printout is waiting for the
+      // session this card establishes.
+      setSignInPurpose((event as CustomEvent<string>).detail === "print" ? "print" : "refresh");
       // Signed out, the same button opens the sign-in card instead of a no-op.
       if (readStoredAttendance()) resyncRef.current();
       else setOpen(true);
@@ -352,6 +400,18 @@ export function ImsLoginGate() {
   const selectedYear = confirmedYear || confirmation?.suggested.academicYear || "";
   const selectedSemester = confirmedSemester || confirmation?.suggested.semester || "";
   const canConfirm = !confirmation || ((!confirmation.required.academicYear || !!selectedYear) && (!confirmation.required.semester || !!selectedSemester));
+  /** Saved ID + password: the gate offers the CAPTCHA alone, not the whole form. */
+  const savedAccount = !confirmation && savedCredentials && Boolean(roll.trim()) && Boolean(password);
+  const printing = signInPurpose === "print";
+  const gateIntro = savedAccount
+    ? syncing
+      ? `Enter the CAPTCHA to ${printing ? "print your IMS profile" : "refresh attendance"} for ${roll.trim()} — your saved ID and password are sent with it.`
+      : `Signing in as ${roll.trim()} on this device. Enter the CAPTCHA to continue.`
+    : syncing
+      ? printing
+        ? "Your IMS session expired. Sign in again and the printout opens by itself."
+        : "Your IMS session expired. Sign in again to refresh attendance."
+      : "Sign in with your NSUT IMS account.";
 
   return <>
     {attendance && !open && <button className="imsSessionButton" type="button" onClick={() => setOpen(true)}><Activity size={15} /> {attendance.roll || "IMS connected"}</button>}
@@ -359,8 +419,8 @@ export function ImsLoginGate() {
     {((open && !attendance) || syncing) && <div className="imsGateBackdrop" role="dialog" aria-modal="true" aria-labelledby="imsGateTitle">
       <form className="imsGateCard" onSubmit={submit}>
         <div className="imsGateMark"><LockKeyhole size={23}/></div>
-        <div className="imsGateEyebrow">{confirmation ? "VERIFY ATTENDANCE PERIOD" : syncing ? "REFRESH SAVED ATTENDANCE" : "SECURE STUDENT ACCESS"}</div>
-        <h2 id="imsGateTitle">{confirmation ? "Confirm your IMS selection" : syncing ? "Refresh IMS attendance" : "Connect to NSUT IMS"}</h2>
+        <div className="imsGateEyebrow">{confirmation ? "VERIFY ATTENDANCE PERIOD" : syncing ? (printing ? "IMS SIGN-IN" : "REFRESH SAVED ATTENDANCE") : "SECURE STUDENT ACCESS"}</div>
+        <h2 id="imsGateTitle">{confirmation ? "Confirm your IMS selection" : syncing ? (printing ? "Sign in to print your profile" : "Refresh IMS attendance") : "Connect to NSUT IMS"}</h2>
         {confirmation ? <>
           <p className="imsGateIntro">{confirmation.message} Pick from the options IMS returned.</p>
           {confirmation.required.academicYear
@@ -380,15 +440,23 @@ export function ImsLoginGate() {
               </label>
             : <p className="imsDetectedSelection">Semester detected from IMS: <b>{confirmation.semesterOptions.find(option => option.value === selectedSemester)?.label ?? selectedSemester}</b></p>}
         </> : <>
-          <p className="imsGateIntro">{syncing
-            ? "Your IMS session expired. Sign in again to refresh attendance."
-            : "Sign in with your NSUT IMS account."}</p>
-          <label>IMS ID / Roll number<input ref={rollRef} name="username" autoComplete="username" enterKeyHint="next" value={roll} onChange={e => updateRoll(e.target.value)} required placeholder="Enter your IMS ID" /></label>
-          <label>Password<span className="imsPasswordWrap"><input name="password" autoComplete="current-password" type={showPassword ? "text" : "password"} value={password} onChange={e => updatePassword(e.target.value)} required placeholder="Enter your IMS password" /><button type="button" onClick={() => setShowPassword(v => !v)} aria-label={showPassword ? "Hide password" : "Show password"}>{showPassword ? <EyeOff size={17}/> : <Eye size={17}/>}</button></span></label>
-          <label className="imsRememberRow imsRememberCredentials">
-            <input type="checkbox" checked={rememberCredentials} onChange={event => updateRememberCredentials(event.target.checked)} />
-            <span><b>Remember my IMS ID and password on this device</b><small>Plain text in this browser. Avoid on shared devices; logging out erases them.</small></span>
-          </label>
+          <p className="imsGateIntro">{gateIntro}</p>
+          {savedAccount ? (
+            <div className="imsSavedAccount">
+              <span>
+                <b>{roll.trim()}</b>
+                <small>ID and password saved on this device</small>
+              </span>
+              <button type="button" onClick={useDifferentAccount} disabled={loading || captchaLoading}>Use a different account</button>
+            </div>
+          ) : <>
+            <label>IMS ID / Roll number<input ref={rollRef} name="username" autoComplete="username" enterKeyHint="next" value={roll} onChange={e => updateRoll(e.target.value)} required placeholder="Enter your IMS ID" /></label>
+            <label>Password<span className="imsPasswordWrap"><input name="password" autoComplete="current-password" type={showPassword ? "text" : "password"} value={password} onChange={e => updatePassword(e.target.value)} required placeholder="Enter your IMS password" /><button type="button" onClick={() => setShowPassword(v => !v)} aria-label={showPassword ? "Hide password" : "Show password"}>{showPassword ? <EyeOff size={17}/> : <Eye size={17}/>}</button></span></label>
+            <label className="imsRememberRow imsRememberCredentials">
+              <input type="checkbox" checked={rememberCredentials} onChange={event => updateRememberCredentials(event.target.checked)} />
+              <span><b>Remember my IMS ID and password on this device</b><small>Plain text in this browser. Avoid on shared devices; logging out erases them.</small></span>
+            </label>
+          </>}
           {captchaRequired && <>
             <div className="imsCaptchaHead"><label htmlFor="imsCaptchaInput">Enter the CAPTCHA from IMS</label><button type="button" onClick={() => void newCaptcha()} disabled={captchaLoading || loading} aria-label="Load a new CAPTCHA image"><RefreshCw size={14}/> Refresh</button></div>
             {captcha
@@ -403,8 +471,8 @@ export function ImsLoginGate() {
         {error && <div className="imsGateError" role="alert">{error}</div>}
         <button className="imsGateSubmit" type="submit" disabled={loading || captchaLoading || !canConfirm || (confirmation ? !confirmation.sessionId : !sessionId || (captchaRequired && !captcha))}>
           {loading
-            ? <><Loader2 className="imsSpin" size={17}/> {confirmation ? "Loading selected attendance…" : "Signing in and fetching attendance…"}</>
-            : confirmation ? "Confirm & load attendance" : "Sign in & fetch attendance"}
+            ? <><Loader2 className="imsSpin" size={17}/> {confirmation ? "Loading selected attendance…" : syncing ? (printing ? "Signing in and opening the printout…" : "Signing in and updating attendance…") : "Signing in and fetching attendance…"}</>
+            : confirmation ? "Confirm & load attendance" : syncing ? (printing ? "Sign in & print profile" : "Refresh attendance") : "Sign in & fetch attendance"}
         </button>
         {syncing && !confirmation && <button className="imsGateCancel" type="button" onClick={cancelResync}>Cancel refresh</button>}
         {!confirmation && <p className="imsGateFoot">Your password goes only to NSUT IMS.</p>}

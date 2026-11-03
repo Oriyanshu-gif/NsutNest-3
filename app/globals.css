@@ -628,6 +628,14 @@ body{
 /* Saving a password is a real trade-off, so it reads as a warning, not a default. */
 .imsRememberCredentials b{color:#ffd7a3}
 .imsRememberCredentials small{color:#9b8b74}
+/* Saved ID + password: one line instead of two inputs, so a refresh is CAPTCHA-only. */
+.imsSavedAccount{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:12px 0 4px;padding:11px 12px;border:1px solid #2b4152;background:#0c141b;border-radius:10px}
+.imsSavedAccount span{display:flex;flex-direction:column;gap:3px;min-width:0}
+.imsSavedAccount b{color:#e6eef5;font-size:13px;font-weight:700;letter-spacing:.02em;overflow-wrap:anywhere}
+.imsSavedAccount small{color:#7e8e9e;font-size:10.5px;line-height:1.4}
+.imsSavedAccount button{background:transparent;border:1px solid #33465a;border-radius:7px;padding:6px 9px;color:#9fb4ff;font-size:10.5px;font-weight:600;white-space:nowrap;cursor:pointer}
+.imsSavedAccount button:hover{border-color:#4a6280;color:#c3d0ff}
+.imsSavedAccount button:disabled{opacity:.5;cursor:default}
 .imsDetectedSelection{margin:12px 0;padding:11px 12px;border:1px solid #294c3b;background:#101a16;border-radius:9px;color:#9caaba;font-size:12px;line-height:1.5}
 .imsDetectedSelection b{color:#b7f3cd}
 .imsPasswordWrap{display:flex;position:relative}.imsPasswordWrap input{padding-right:44px}.imsPasswordWrap button{position:absolute;right:5px;top:4px;bottom:4px;width:34px;border:0;background:transparent;color:#9caaba;display:grid;place-items:center;cursor:pointer}
@@ -844,6 +852,10 @@ body{
 .myProfilePrintButton{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:41px;border-radius:10px;padding:10px 15px;font:600 12.5px 'Plus Jakarta Sans',sans-serif;cursor:pointer;transition:.18s;white-space:nowrap;background:var(--green);border:1px solid var(--green);color:#03140c;box-shadow:0 12px 30px -20px rgba(75,224,145,.8)}
 .myProfilePrintButton:hover:not(:disabled){filter:brightness(1.07)}
 .myProfilePrintButton:disabled{opacity:.55;cursor:not-allowed}
+/* The IMS printout is printed from this frame, so it lives off-screen but is
+   still laid out (display:none would stop the browser rendering it). */
+.imsPrintFrame{position:fixed;top:0;left:-10000px;width:820px;height:1160px;border:0;visibility:visible;pointer-events:none}
+.myProfilePrintNotice{margin:0;max-width:260px;font-size:11px;line-height:1.45;color:#9caaba}
 
 .myProfileAlert{display:flex;align-items:flex-start;gap:12px;margin-bottom:18px;padding:14px 16px;border:1px solid #5b3d23;border-radius:12px;background:#19130d;color:#eac6a6;font-size:12px;line-height:1.5}
 .myProfileAlert>svg{flex-shrink:0;margin-top:1px;color:#ff9d6d}

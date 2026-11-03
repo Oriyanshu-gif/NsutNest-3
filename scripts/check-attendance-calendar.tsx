@@ -19,6 +19,15 @@ const today = new Date();
 const todayIso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 const todayDay = String(today.getDate());
 const thisMonth = todayIso.slice(0, 7);
+/**
+ * Days the fixture writes its records on. None may be today: the calendar merges
+ * every record for one date, so a collision would turn the doubled period into a
+ * "×3" badge and make the totals below describe data that was never handed in.
+ */
+const [firstDay, secondDay, thirdDay, fourthDay] = [1, 2, 3, 4].includes(today.getDate())
+  ? [9, 10, 11, 12]
+  : [1, 2, 3, 4];
+const fixtureDate = (day: number) => `${thisMonth}-${String(day).padStart(2, '0')}`;
 
 const html = renderToStaticMarkup(
   <SubjectAttendanceCalendar
@@ -29,10 +38,10 @@ const html = renderToStaticMarkup(
     attendanceLegend={{ '0': 'absent', '1': 'present' }}
     statusLegend={{ GH: 'Gazetted Holiday', TL: 'Teacher on Leave' }}
     daily={[
-      { date: `${thisMonth}-01`, values: { MEMEC304: '1' } },
-      { date: `${thisMonth}-02`, values: { MEMEC304: '0' } },
-      { date: `${thisMonth}-03`, values: { MEMEC304: '1+1' } },
-      { date: `${thisMonth}-04`, values: { MEMEC304: 'GH' } },
+      { date: fixtureDate(firstDay), values: { MEMEC304: '1' } },
+      { date: fixtureDate(secondDay), values: { MEMEC304: '0' } },
+      { date: fixtureDate(thirdDay), values: { MEMEC304: '1+1' } },
+      { date: fixtureDate(fourthDay), values: { MEMEC304: 'GH' } },
       { date: todayIso, values: { MEMEC304: '1' } },
       { date: '2026-08-05', values: { MEMEC304: '1' } },
     ]}
@@ -45,7 +54,7 @@ check('calendar leads with the subject name', html.includes('<b>Thermal Engineer
 check('calendar shows the IMS code chip after the name', /class="attCode">MEMEC304</.test(html));
 check('month picker offers every month with records', (html.match(/<option/g) ?? []).length === 2);
 check('month picker is labelled for screen readers', html.includes('aria-label="Choose attendance month"'));
-// 1 + 1 on the 1st, 0 on the 2nd, 1+1 on the 3rd, a holiday mark on the 4th and 1 today.
+// 1 on day 1, 0 on day 2, 1+1 on day 3, a holiday mark on day 4 and 1 today.
 check('this month\'s totals are shown', html.includes('>4</b> present') && html.includes('>1</b> absent') && html.includes('>1</b> other marks'));
 check('this month\'s percentage is shown', html.includes('>80.0%</b> this month'));
 check('dated entry count is shown', html.includes('5 dated entries'));
@@ -56,9 +65,10 @@ check('double classes are summarised', html.includes('<small>×2</small>'));
 check('legend explains the portal status marks', html.includes('Gazetted Holiday') && /<b>GH<\/b>/.test(html));
 // The tooltip names the real date of the selected month and marks today, so the
 // expectation is derived instead of being tied to one calendar month.
-const secondLabel = attendanceDateLabel(`${thisMonth}-02`);
+const secondDate = fixtureDate(secondDay);
+const secondLabel = attendanceDateLabel(secondDate);
 check('day tooltips describe the record',
-  html.includes(`title="${secondLabel}${todayDay === '02' ? ' · today' : ''} — absent"`),
+  html.includes(`title="${secondLabel}${secondDate === todayIso ? ' · today' : ''} — absent"`),
   html.match(/title="[^"]*"/g)?.slice(0, 3).join(' | ') ?? '');
 
 // A subject with no records for the selected month explains itself instead of rendering an empty grid.

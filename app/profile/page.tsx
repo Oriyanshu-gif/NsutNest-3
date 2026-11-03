@@ -10,7 +10,7 @@
  * clean A4 sheet without the app chrome.
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, Loader2, Printer, UserRound } from "lucide-react";
 import HubShell from "../hub-shell";
 import {
@@ -61,6 +61,14 @@ function MyProfileBody() {
   const [photoFailed, setPhotoFailed] = useState(false);
   const [reloadToken, setReloadToken] = useState(0);
   const [openingPrint, setOpeningPrint] = useState(false);
+  /** The IMS printout, rendered off-screen so the browser prints IMS's own sheet. */
+  const [printHtml, setPrintHtml] = useState("");
+  /** True while a print waits for the sign-in card to finish an IMS session. */
+  const [awaitingImsForPrint, setAwaitingImsForPrint] = useState(false);
+  const [printNotice, setPrintNotice] = useState("");
+  const printFrameRef = useRef<HTMLIFrameElement>(null);
+  /** Stops a refused print from bouncing between the gate and this page. */
+  const printAttemptsRef = useRef(0);
 
   // The cached copy paints immediately, then a fresh request replaces it. This
   // keeps the sidebar photograph and the print sheet instant on every visit.
@@ -135,42 +143,75 @@ function MyProfileBody() {
   }
 
   /**
-   * Opens the portal's own Print Profile page. IMS only serves that link inside
-   * the signed-in session, so the request goes through our API route, which
-   * returns the page HTML (photograph already inlined) for a new tab.
+   * Prints IMS's own Print Profile form, never this page.
+   *
+   * IMS only serves that link inside the signed-in session, so the HTML comes
+   * back from `/api/ims/profile/print` (photograph already inlined) and is put in
+   * a hidden same-origin iframe, whose document is what the browser prints.
+   *
+   * When the IMS session is alive the printout appears immediately with no
+   * prompt. When it has lapsed, the shared sign-in card is opened — CAPTCHA only
+   * if the ID and password are saved on this device — and the print is retried by
+   * itself as soon as that session lands.
    */
   async function printProfile() {
-    if (!profile || openingPrint) return;
-    // Opened during the click so the browser counts it as a user gesture.
-    const printWindow = window.open("", "ims-profile-print", "width=920,height=1040");
+    if (openingPrint) return;
     setOpeningPrint(true);
+    setPrintNotice("");
+    // Unmount the previous printout so a repeat click reloads the iframe and
+    // fires its print again.
+    setPrintHtml("");
     try {
       const response = await fetch("/api/ims/profile/print", { cache: "no-store" });
+      if (response.status === 401) {
+        printAttemptsRef.current += 1;
+        if (printAttemptsRef.current > 2) {
+          setPrintNotice("IMS did not accept the new session. Sign in from the dashboard, then press Print Profile again.");
+          setOpeningPrint(false);
+          return;
+        }
+        setAwaitingImsForPrint(true);
+        setPrintNotice("Sign in to IMS and the printout opens by itself.");
+        requestAttendanceRefresh("print");
+        return;
+      }
       if (!response.ok) {
         const body = await response.json().catch(() => ({})) as { error?: string };
         throw new Error(body.error || "Could not open the IMS printout.");
       }
-      const html = await response.text();
-      if (!printWindow) throw new Error("Allow pop-ups to open the IMS printout.");
-      const url = URL.createObjectURL(new Blob([html], { type: "text/html" }));
-      printWindow.location.replace(url);
-      printWindow.focus();
-      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
-    } catch {
-      // IMS would not hand over its printout, so fall back to the copy already
-      // on this device instead of showing another banner.
-      printWindow?.close();
-      printDeviceCopy();
-    } finally {
+      printAttemptsRef.current = 0;
+      setPrintHtml(await response.text());
+    } catch (failure) {
+      setPrintNotice(failure instanceof Error ? failure.message : "Could not open the IMS printout.");
       setOpeningPrint(false);
     }
   }
 
-  /** On-device copy: the browser prints the sheet styled by @media print. */
-  function printDeviceCopy() {
-    if (!profile) return;
-    window.print();
-  }
+  // Latest printProfile for the sync listener below, which is mounted once per
+  // pending print instead of on every render.
+  const printRef = useRef(printProfile);
+  printRef.current = printProfile;
+
+  /** A finished IMS sign-in completes a print that was waiting for one. */
+  useEffect(() => {
+    if (!awaitingImsForPrint) return;
+    const onSync = () => {
+      setAwaitingImsForPrint(false);
+      void printRef.current();
+    };
+    window.addEventListener(ATTENDANCE_SYNC_EVENT, onSync);
+    // A dismissed sign-in card never syncs, so stop waiting instead of leaving
+    // the button spinning forever.
+    const timer = window.setTimeout(() => {
+      setAwaitingImsForPrint(false);
+      setOpeningPrint(false);
+      setPrintNotice("Sign-in was not completed. Press Print Profile to try again.");
+    }, 120_000);
+    return () => {
+      window.removeEventListener(ATTENDANCE_SYNC_EVENT, onSync);
+      window.clearTimeout(timer);
+    };
+  }, [awaitingImsForPrint]);
 
 
   return (
@@ -182,10 +223,13 @@ function MyProfileBody() {
           <p>Your details and photograph, straight from IMS.</p>
         </div>
         <div className="myProfileActions">
-          <button className="myProfilePrintButton" type="button" onClick={printProfile} disabled={!profile || openingPrint}>
+          <button className="myProfilePrintButton" type="button" onClick={printProfile} disabled={openingPrint && !awaitingImsForPrint}>
             {openingPrint ? <Loader2 size={16} className="attSpinIcon" /> : <Printer size={16} />}
-            {openingPrint ? "Opening IMS printout…" : "Print Profile"}
+            {openingPrint
+              ? awaitingImsForPrint ? "Waiting for IMS sign-in…" : "Opening IMS printout…"
+              : "Print Profile"}
           </button>
+          {printNotice && <p className="myProfilePrintNotice" role="status" aria-live="polite">{printNotice}</p>}
         </div>
       </header>
 
@@ -198,7 +242,7 @@ function MyProfileBody() {
           </div>
           <div className="myProfileAlertActions">
             <button type="button" onClick={refresh}>Try again</button>
-            <button type="button" onClick={requestAttendanceRefresh}>Sync IMS</button>
+            <button type="button" onClick={() => requestAttendanceRefresh()}>Sync IMS</button>
           </div>
         </div>
       )}
@@ -216,7 +260,7 @@ function MyProfileBody() {
           <span className="myProfileEmptyIcon"><UserRound size={30} /></span>
           <h2>Connect your IMS profile</h2>
           <p>Sign in once on the dashboard and your IMS details and photograph appear here.</p>
-          <button type="button" onClick={requestAttendanceRefresh}>Sign in &amp; sync IMS</button>
+          <button type="button" onClick={() => requestAttendanceRefresh()}>Sign in &amp; sync IMS</button>
         </div>
       )}
 
@@ -259,6 +303,28 @@ function MyProfileBody() {
             ))}
           </dl>
         </article>
+      )}
+
+      {/* Off-screen by design: printing this frame prints IMS's own profile form,
+          which is the sheet a student needs for verification. */}
+      {printHtml && (
+        <iframe
+          ref={printFrameRef}
+          className="imsPrintFrame"
+          title="IMS Print Profile"
+          srcDoc={printHtml}
+          onLoad={() => {
+            setOpeningPrint(false);
+            const frame = printFrameRef.current;
+            if (!frame?.contentWindow) return;
+            try {
+              frame.contentWindow.focus();
+              frame.contentWindow.print();
+            } catch {
+              setPrintNotice("Your browser blocked the print dialog. Allow printing for this site and try again.");
+            }
+          }}
+        />
       )}
     </div>
   );

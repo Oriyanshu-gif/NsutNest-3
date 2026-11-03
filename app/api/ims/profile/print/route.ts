@@ -85,8 +85,10 @@ export async function GET(request: NextRequest) {
 
   const session = readImsSession(request.cookies.get(IMS_COOKIE_NAME)?.value);
   if (!session || session.stage !== 'attendance' || !session.studentRoll) {
+    // `needsLogin` tells the page to run the same sign-in card as attendance
+    // (CAPTCHA only when the credentials are saved) and then retry the print.
     return NextResponse.json(
-      { error: 'Sign in to NSUT IMS to print your profile.' },
+      { error: 'Your IMS session ended. Sign in to print your IMS profile.', needsLogin: true },
       { status: 401, headers: { 'Cache-Control': 'no-store' } },
     );
   }
@@ -133,7 +135,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     if (error instanceof ImsSessionExpiredError) {
       return clearImsCookie(NextResponse.json(
-        { error: 'Your IMS session has expired. Sync your attendance to sign in again.' },
+        { error: 'Your IMS session has expired. Sign in again to print your profile.', needsLogin: true },
         { status: 401, headers: { 'Cache-Control': 'no-store' } },
       ));
     }

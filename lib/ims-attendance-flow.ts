@@ -70,14 +70,58 @@ export function readControls(pages: ImsHttpPage[]): AttendanceControls | null {
   return null;
 }
 
-export async function loadAttendancePages(session: ImsHttpSession) {
+/**
+ * Collects the pages that carry the attendance dropdowns.
+ *
+ * `navigationUrls` holds every page and frame reached during login, so loading
+ * all of them walks dozens of portal responses for nothing. The attendance form
+ * is normally in the first URL's frames, so stop as soon as the controls are on
+ * screen — that keeps a refresh to a couple of requests instead of a batch that
+ * outlives the serverless timeout and looks like a dead button to the student.
+ */
+export async function loadAttendancePages(session: ImsHttpSession, maxPages = 12) {
   if (!session.navigationUrls?.length) throw new Error('The IMS attendance session is missing. Refresh the CAPTCHA and try again.');
   const pages: ImsHttpPage[] = [];
   for (const url of session.navigationUrls) {
-    const loaded = await readImsFrames(session, url);
+    const loaded = await readImsFrames(session, url, undefined, maxPages);
     for (const page of loaded) if (!pages.some(existing => existing.url === page.url)) pages.push(page);
+    if (readControls(pages)) break;
+    // IMS answers an expired session with its login page; nothing further in the
+    // queue can produce attendance tables, so report it straight away.
+    if (pages.some(page => /<input[^>]+type=["']?password/i.test(page.html))) break;
   }
   return pages;
+}
+
+/** True when IMS replaced a page with its own login form (upstream session gone). */
+export function looksSignedOut(pages: ImsHttpPage[]) {
+  return pages.some(page => /<input[^>]+type=["']?password/i.test(page.html));
+}
+
+/**
+ * Asks the browser to pick the academic year and semester itself.
+ *
+ * Used both after a fresh login and when a cached refresh finds the portal on a
+ * different period, so the student confirms a pair instead of signing in again.
+ */
+export function confirmationResponse(
+  session: ImsHttpSession,
+  controls: AttendanceControls,
+  academicYear: SelectOption | null,
+  semester: SelectOption | null,
+  message: string,
+) {
+  const response = NextResponse.json({
+    needsConfirmation: true,
+    sessionId: session.id,
+    academicYearOptions: controls.academicYear.options.map(({ value, label }) => ({ value, label })),
+    semesterOptions: controls.semester.options.map(({ value, label }) => ({ value, label })),
+    suggested: { academicYear: academicYear?.value ?? '', semester: semester?.value ?? '' },
+    required: { academicYear: !academicYear, semester: !semester },
+    message,
+  }, { headers: { 'Cache-Control': 'no-store' } });
+  response.cookies.set(IMS_COOKIE_NAME, encodeImsSession(session), imsCookieOptions());
+  return response;
 }
 
 export function findOption(control: SelectControl, value: string) {
@@ -162,24 +206,40 @@ export async function submitAttendance(
 export async function refreshImsAttendance(request: NextRequest) {
   const session = readImsSession(request.cookies.get(IMS_COOKIE_NAME)?.value);
   if (!session || session.stage !== 'attendance' || !session.studentRoll || !session.navigationUrls?.length) {
-    return NextResponse.json({ error: 'IMS login required.' }, { status: 401 });
+    // Not an error the student caused: the saved session is simply gone, so the
+    // client only has to offer the CAPTCHA. `needsLogin` is what drives that.
+    return NextResponse.json(
+      { error: 'Your IMS session ended. Enter the CAPTCHA to refresh attendance.', needsLogin: true },
+      { status: 401 },
+    );
   }
   try {
     const pages = await loadAttendancePages(session);
-    // IMS sometimes responds with the login page when the upstream session expires.
-    if (pages.some(page => /<input[^>]+type=["']?password/i.test(page.html))) {
-      const response = NextResponse.json({ error: 'IMS session expired.' }, { status: 401 });
+    // IMS answers an expired session with its login form.
+    if (looksSignedOut(pages)) {
+      const response = NextResponse.json({ error: 'Your IMS session expired.', needsLogin: true }, { status: 401 });
       response.cookies.set(IMS_COOKIE_NAME, '', { ...imsCookieOptions(), maxAge: 0 });
       return response;
     }
     const controls = readControls(pages);
-    if (!controls) throw new Error('IMS attendance controls unavailable. Try again later.');
+    if (!controls) {
+      // No dropdowns means this cached session cannot be driven any further, so
+      // the client is told to start a fresh sign-in rather than left with a
+      // button that silently does nothing.
+      const response = NextResponse.json({ error: 'The saved IMS session can no longer be used.', needsLogin: true }, { status: 401 });
+      response.cookies.set(IMS_COOKIE_NAME, '', { ...imsCookieOptions(), maxAge: 0 });
+      return response;
+    }
     const year = findOption(controls.academicYear, session.academicYearValue || '');
     const semester = findOption(controls.semester, session.semesterValue || '');
-    if (!year || !semester) throw new Error('IMS attendance period changed. Please sign in again if needed.');
+    if (!year || !semester) {
+      // The portal moved to a new academic year or semester: offer the choices
+      // instead of forcing a whole new login.
+      return confirmationResponse(session, controls, year, semester, 'IMS reports a different attendance period. Confirm the academic year and semester.');
+    }
     return await submitAttendance(session, controls, year, semester);
   } catch (error) {
     const safe = safeUpstreamError(error);
-    return NextResponse.json({ error: safe.message }, { status: safe.status });
+    return NextResponse.json({ error: safe.message, needsLogin: true }, { status: 401 });
   }
 }

@@ -18,13 +18,12 @@ import { loginFailureMessage, safeUpstreamError } from '../../../../lib/ims-auth
 import { rateLimit, requestKey } from '../../../../lib/rate-limit';
 import {
   academicYearKey,
+  confirmationResponse,
   findOption,
   loadAttendancePages,
   readControls,
   semesterNumber,
   submitAttendance,
-  type AttendanceControls,
-  type SelectControl,
   type SelectOption,
 } from '../../../../lib/ims-attendance-flow';
 
@@ -97,30 +96,6 @@ function resolveSemester(options: SelectOption[], text: string, roll: string): S
   const number = actual.value ?? expectedSemester(roll);
   const matches = number ? options.filter(option => Number(semesterNumber(option.label) ?? semesterNumber(option.value)) === number) : [];
   return matches.length === 1 ? matches[0] : null;
-}
-
-function publicOptions(control: SelectControl) {
-  return control.options.map(({ value, label }) => ({ value, label }));
-}
-
-function confirmationResponse(
-  session: ImsHttpSession,
-  controls: AttendanceControls,
-  academicYear: SelectOption | null,
-  semester: SelectOption | null,
-  message: string,
-) {
-  const response = NextResponse.json({
-    needsConfirmation: true,
-    sessionId: session.id,
-    academicYearOptions: publicOptions(controls.academicYear),
-    semesterOptions: publicOptions(controls.semester),
-    suggested: { academicYear: academicYear?.value ?? '', semester: semester?.value ?? '' },
-    required: { academicYear: !academicYear, semester: !semester },
-    message,
-  }, { headers: { 'Cache-Control': 'no-store' } });
-  response.cookies.set(IMS_COOKIE_NAME, encodeImsSession(session), imsCookieOptions());
-  return response;
 }
 
 /**

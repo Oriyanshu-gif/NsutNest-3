@@ -130,10 +130,13 @@ export function notifyProfileSync(): void {
  *
  * Only the gate (rendered once in the root layout) holds the CAPTCHA session and
  * the credential form, so a page cannot refresh attendance by itself: it fires
- * this event and the gate opens its "Refresh IMS attendance" dialog.
+ * this event and the gate opens its sign-in dialog. The optional reason only
+ * changes that dialog's wording — `print` is a profile printout waiting for a
+ * session, everything else is a plain refresh.
  */
-export function requestAttendanceRefresh(): void {
-  if (typeof window !== "undefined") window.dispatchEvent(new Event(ATTENDANCE_REFRESH_EVENT));
+export function requestAttendanceRefresh(reason: "refresh" | "print" = "refresh"): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent(ATTENDANCE_REFRESH_EVENT, { detail: reason }));
 }
 
 /** Reads the remembered IMS ID, migrating the pre-rename key when found. */

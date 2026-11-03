@@ -338,9 +338,9 @@ function OverviewBody() {
                 <button
                   className="attRefreshButton"
                   type="button"
-                  onClick={requestAttendanceRefresh}
+                  onClick={() => requestAttendanceRefresh()}
                   disabled={attendanceRefreshing}
-                  title={`Last synced ${new Date(liveAttendance.syncedAt).toLocaleString()} — sign in to fetch the latest attendance from NSUT IMS`}
+                  title={`Last synced ${new Date(liveAttendance.syncedAt).toLocaleString()} — fetch the latest attendance from NSUT IMS. If your IMS ID is saved on this device, only the CAPTCHA is asked for.`}
                 >
                   <RefreshCw size={13} className={attendanceRefreshing ? "attSpinIcon" : undefined} /> {attendanceRefreshing ? "Updating..." : "Refresh from IMS"}
                 </button>

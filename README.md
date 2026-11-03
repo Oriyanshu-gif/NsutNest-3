@@ -167,7 +167,13 @@ in `localStorage` so the site stays signed in on that device across restarts —
 sync instead of one per visit — and is cleared by logging out. The dashboard labels a snapshot
 "Live IMS" for six hours after a sync and "Saved attendance" afterwards, and the account banner
 offers **Sync again**, which refreshes the data without discarding the saved snapshot; the
-attendance panel's **Refresh from IMS** does the same. Because the
+attendance panel's **Refresh from IMS** does the same. Both go through `/api/ims/refresh`,
+which first reuses the authenticated IMS cookies and only asks for a new CAPTCHA when IMS has
+dropped that session — a saved snapshot therefore refreshes without a fresh login. When the ID
+and password are saved on the device, the refresh card asks for the CAPTCHA alone and submits
+the saved pair behind it; without them it asks for the full sign-in. The refresh also stops
+reading IMS pages as soon as the attendance dropdowns are on screen, so a click resolves in a
+few portal requests instead of walking every frame from the login flow. Because the
 saved payload contains personal attendance, it is device- and browser-profile-local and is not
 sent to the server; signing out removes it from both `localStorage` and `sessionStorage`.
 Cached attendance without a student roll is treated as unidentified and requires a fresh
@@ -203,12 +209,29 @@ flag, and the form collapses to just ID and password without any other UI change
   minute on CAPTCHA issuance) with a `Retry-After` header. On Vercel each serverless instance
   keeps its own counters, so this blunts bursts and retry loops rather than enforcing a global
   quota; a shared store would be needed for that.
+- A refresh that cannot reuse its session always answers `401` with `needsLogin: true`, so the
+  button can never dead-end: the UI re-authenticates with a CAPTCHA instead of silently
+  swallowing the failure. A changed academic year or semester answers with the picker instead
+  of forcing a new login.
 - Authentication responses are `Cache-Control: no-store`, and upstream failures are mapped to
   short, actionable messages by `lib/ims-auth-errors.ts` so portal status codes, HTML and stack
   traces never reach the browser. Credentials, CAPTCHA text and cookies are not logged.- Passwords are not persisted by default. A failed attempt keeps the typed ID and password in
   React state so the student only re-enters the new CAPTCHA, and logging out clears both. The
   opt-in **Remember my IMS ID and password on this device** checkbox stores them in
   `localStorage` in plain text (see above); without it, every refresh asks for both.
+
+#### Print Profile
+
+**Print Profile** on `/profile` prints IMS's own *Print Profile* form, not this dashboard. IMS
+only serves that link inside the signed-in session, so `/api/ims/profile/print` loads the page
+(clicking the portal's own Print Profile link), inlines the photograph and returns the HTML,
+which is rendered in an off-screen same-origin iframe and printed from there. The app page is
+never printed — the old fallback that called `window.print()` on the dashboard has been removed.
+
+When the IMS session is still alive the printout opens with no prompt at all. When it has
+lapsed the route answers `401` with `needsLogin: true`, the shared sign-in card opens — CAPTCHA
+only if the ID and password are saved on the device, the full form otherwise — and the print
+retries by itself as soon as the new session lands, guarded so a refused print cannot loop.
 
 Offline checks: `npm run check:ims` covers the session cookie, id binding and rotation, cookie
 flags, rate limiting and the error copy; `npm run check:attendance` covers parsing and the
