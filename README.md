@@ -226,7 +226,7 @@ and form behavior can change, so verify the flow against the live portal after d
 
 ## Placement data
 
-The Training & Placement page loads the supplied `placements.json` file from `public/data/placements.json` and renders searchable, filterable placement and internship records. No Google Sheet is embedded. Records may be historical or incomplete; verify details with official NSUT T&P sources.
+The Training & Placement page currently shows official T&P links and contact details, with a **Coming soon** panel in place of the dataset browser. The 602-entry source file now lives at `data/placements.json` (outside `public/`, so it is not downloadable) and can be moved back to `public/data/` when the dataset is ready to publish.
 
 ## Installable PWA (Progressive Web App)
 

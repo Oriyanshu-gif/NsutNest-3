@@ -9,7 +9,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { BookOpen, FileText, Home, Loader2, ScrollText, X } from "lucide-react";
+import { BookOpen, Home, Loader2 } from "lucide-react";
 import HubShell from "../hub-shell";
 import { withResolvedSubjectNames } from "../../lib/attendance";
 import { ATTENDANCE_SYNC_EVENT, readStoredAttendance } from "../../lib/app-storage";
@@ -20,12 +20,6 @@ type StudyPayload = { subjects: StudySubject[]; semester: string; academicYear?:
 function semesterLabel(value: string): string {
   return /^(?:semester|sem\b)/i.test(value) ? value : `Semester ${value}`;
 }
-
-const RESOURCE_CHIPS = [
-  { label: "Notes", icon: BookOpen },
-  { label: "PYQs", icon: FileText },
-  { label: "Syllabus", icon: ScrollText },
-] as const;
 
 export default function StudyMaterial() {
   return (
@@ -38,7 +32,6 @@ export default function StudyMaterial() {
 function StudyMaterialBody() {
   const [payload, setPayload] = useState<StudyPayload | null>(null);
   const [loaded, setLoaded] = useState(false);
-  const [comingSoon, setComingSoon] = useState("");
 
   useEffect(() => {
     const sync = () => {
@@ -73,17 +66,11 @@ function StudyMaterialBody() {
 
   return (
     <main className="studyShell">
-      {comingSoon && (
-        <div className="studyComingSoon" role="status" aria-live="polite">
-          <span><b>{comingSoon}</b> — Coming soon. Study resources are being prepared.</span>
-          <button type="button" onClick={() => setComingSoon("")} aria-label="Dismiss message"><X size={16} /></button>
-        </div>
-      )}
       <header className="studyHeader">
         <div>
           <small className="panelKicker">LEARN SMARTER</small>
           <h1>Study material</h1>
-          <p>Notes, previous-year papers and syllabus for every subject in your IMS semester.</p>
+          <p>Your IMS semester subjects in one place. Notes, PYQs and syllabus are being prepared.</p>
         </div>
         <span className="studySync">{payload ? syncLabel : "Not synced"}</span>
       </header>
@@ -109,18 +96,9 @@ function StudyMaterialBody() {
                   <h3>{title}</h3>
                   {title !== subject.code && <span className="attCode">{subject.code}</span>}
                 </div>
-                <div className="studyChips">
-                  {RESOURCE_CHIPS.map(({ label, icon: Icon }) => (
-                    <button
-                      className="studyChip"
-                      key={label}
-                      type="button"
-                      onClick={() => setComingSoon(`${title} · ${label}`)}
-                    >
-                      <Icon size={13} /> {label}
-                    </button>
-                  ))}
-                </div>
+                {/* One honest status line instead of three buttons that only
+                    opened a "coming soon" toast. */}
+                <p className="studyCardSoon"><BookOpen size={13} /> Resources coming soon</p>
               </article>
             );
           })}

@@ -340,7 +340,11 @@ export function ImsLoginGate() {
   const resyncRef = useRef(startResync);
   resyncRef.current = startResync;
   useEffect(() => {
-    const onRequest = () => { if (readStoredAttendance()) resyncRef.current(); };
+    const onRequest = () => {
+      // Signed out, the same button opens the sign-in card instead of a no-op.
+      if (readStoredAttendance()) resyncRef.current();
+      else setOpen(true);
+    };
     window.addEventListener(ATTENDANCE_REFRESH_EVENT, onRequest);
     return () => window.removeEventListener(ATTENDANCE_REFRESH_EVENT, onRequest);
   }, []);
@@ -548,7 +552,7 @@ export default function HubShell({ children }: { children: ReactNode }) {
             </span>
             <span className="hubUserIdentity">
               <b title={studentName}>{studentName}</b>
-              <small>NSUT B.Tech</small>
+              <small>{loggedInStudent ? `Roll ${loggedInStudent.roll}` : "Not signed in to IMS"}</small>
             </span>
           </Link>
         </div>
@@ -576,12 +580,11 @@ export default function HubShell({ children }: { children: ReactNode }) {
             <Link href="/profile" className="hubTopbarProfile" aria-label="Open My Profile">
               {profile?.photo ? <img src={profile.photo} alt="" /> : <span>{studentInitials}</span>}
             </Link>
-            <Link href="/notices" className="hubBell" aria-label="IMS notices">
+            <Link href="/notices" className="hubBell" aria-label="Open IMS notices">
               <Bell size={17} />
-              <i className="hubBellDot" />
             </Link>
-            <span className="hubSemester">
-              <i className="hubSemesterDot" /> IMS attendance sync
+            <span className={`hubSemester ${loggedInStudent ? "connected" : "idle"}`}>
+              <i className="hubSemesterDot" /> {loggedInStudent ? "IMS synced" : "IMS not connected"}
             </span>
           </div>
         </header>

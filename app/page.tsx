@@ -24,7 +24,7 @@ import {
 } from "lucide-react";
 import { loadStudents, type Student } from "../lib/data";
 import { withResolvedSubjectNames } from "../lib/attendance";
-import { ATTENDANCE_SYNC_EVENT, ATTENDANCE_REFRESH_STATUS_EVENT, readStoredAttendance, requestAttendanceRefresh } from "../lib/app-storage";
+import { ATTENDANCE_SYNC_EVENT, ATTENDANCE_REFRESH_STATUS_EVENT, PROFILE_SYNC_EVENT, readStoredAttendance, readStoredProfile, requestAttendanceRefresh } from "../lib/app-storage";
 import { isRecentNotice } from "../lib/notice-date";
 import HubShell from "./hub-shell";
 import { SubjectAttendanceCalendar } from "./attendance-calendar";
@@ -130,6 +130,7 @@ function OverviewBody() {
   const [notices, setNotices] = useState<Payload["notices"] | null>(null);
   const [noticesError, setNoticesError] = useState<string | null>(null);
   const [liveAttendance, setLiveAttendance] = useState<LiveAttendancePayload | null>(null);
+  const [profileName, setProfileName] = useState("");
   const [attendanceRefreshing, setAttendanceRefreshing] = useState(false);
 
   useEffect(() => {
@@ -146,6 +147,12 @@ function OverviewBody() {
   useEffect(() => {
     const sync = () => {
       try {
+        // IMS sometimes returns no name with attendance; the profile does.
+        const profile = readStoredProfile();
+        if (profile) {
+          const parsedProfile = JSON.parse(profile) as { name?: string };
+          setProfileName(parsedProfile.name?.trim() ?? "");
+        }
         const cached = readStoredAttendance();
         const parsed = cached ? JSON.parse(cached) as LiveAttendancePayload : null;
         if (!parsed?.roll?.trim()) {
@@ -160,7 +167,11 @@ function OverviewBody() {
     };
     sync();
     window.addEventListener(ATTENDANCE_SYNC_EVENT, sync);
-    return () => window.removeEventListener(ATTENDANCE_SYNC_EVENT, sync);
+    window.addEventListener(PROFILE_SYNC_EVENT, sync);
+    return () => {
+      window.removeEventListener(ATTENDANCE_SYNC_EVENT, sync);
+      window.removeEventListener(PROFILE_SYNC_EVENT, sync);
+    };
   }, []);
 
   useEffect(() => {
@@ -243,7 +254,11 @@ function OverviewBody() {
   // screen is a fresh sync or a saved snapshot.
   const attendanceFresh = !!liveAttendance
     && Date.now() - new Date(liveAttendance.syncedAt).getTime() < 6 * 60 * 60 * 1000;
-  const firstName = liveAttendance?.name ? liveAttendance.name.split(" ")[0] : "there";
+  const rawName = (liveAttendance?.name || profileName).trim();
+  // IMS prints names in capitals; the familiar mixed case reads better here.
+  const firstName = rawName
+    ? rawName.toLowerCase().replace(/(^|[\s-])([a-z])/g, (_, lead: string, letter: string) => `${lead}${letter.toUpperCase()}`).split(/\s+/)[0]
+    : "";
   const latestSgpa = me?.sgpa ?? null;
   return (
     <>
@@ -252,7 +267,7 @@ function OverviewBody() {
         <div className="hubHeroText">
           <div className="hubDateLine">{dateLine}</div>
           <h1>
-            {greeting(now)}, {firstName} <span className="sparkle">✦</span>
+            {greeting(now)}{firstName ? `, ${firstName}` : ""} <span className="sparkle">✦</span>
           </h1>
           <p>Your campus, your rhythm. Here&apos;s what&apos;s happening today.</p>
         </div>
@@ -268,7 +283,7 @@ function OverviewBody() {
           <Activity className="scIcon att" size={21} />
           <small>Overall attendance</small>
           <b>{subjectRows.length ? `${overall.toFixed(1)}%` : "—"}</b>
-          <span className="scFoot">{liveAttendance ? (attendanceFresh ? "Fetched from NSUT IMS" : "Saved from NSUT IMS") : "Connect to IMS first"} <ArrowUpRight size={12} /></span>
+          <span className="scFoot">{liveAttendance ? (attendanceFresh ? "Fetched from NSUT IMS" : "Saved from NSUT IMS") : "Connect to IMS first"}</span>
           <i className="scGlow" />
         </div>
         <a className="summaryCard sgpaCard" href={me ? `/student/${encodeURIComponent(me.roll)}` : "/results"}>
@@ -276,8 +291,8 @@ function OverviewBody() {
           <small>Latest SGPA</small>
           <b>{latestSgpa !== null ? latestSgpa.toFixed(2) : "—"}</b>
           <span className="scFoot">
-            {me ? `Semester ${me.semester} · ${me.ay}-${String(me.ay + 1).slice(-2)} · ` : ""}
-            Open result details <ArrowUpRight size={12} />
+            {me ? `Sem ${me.semester} · ${me.ay}-${String(me.ay + 1).slice(-2)} · ` : ""}
+            Result details <ArrowUpRight size={12} />
           </span>
           <i className="scGlow" />
         </a>
@@ -288,13 +303,17 @@ function OverviewBody() {
           <span className="scFoot">{newThisWeek} posted this week <ArrowUpRight size={12} /></span>
           <i className="scGlow" />
         </a>
-        <div className="summaryCard pulseCard">
-          <Users className="scIcon pulse" size={21} />
-          <small>Community pulse</small>
-          <b>{visits === null ? "—" : visits}</b>
-          <span className="scFoot">visits so far <ArrowUpRight size={12} /></span>
-          <i className="scGlow" />
-        </div>
+        {/* The tally needs its shared counter; without it a dash-only tile is
+            noise, so the tile simply does not appear. */}
+        {visits !== null && (
+          <div className="summaryCard pulseCard">
+            <Users className="scIcon pulse" size={21} />
+            <small>Site visits</small>
+            <b>{visits}</b>
+            <span className="scFoot">browsing sessions so far</span>
+            <i className="scGlow" />
+          </div>
+        )}
       </section>
 
       {/* ---- Section 2: attendance snapshot + important notices, side by side ---- */}
@@ -326,7 +345,7 @@ function OverviewBody() {
                   <RefreshCw size={13} className={attendanceRefreshing ? "attSpinIcon" : undefined} /> {attendanceRefreshing ? "Updating..." : "Refresh from IMS"}
                 </button>
               )}
-              <span className="policyLink">75% policy <ArrowUpRight size={13} /></span>
+              <span className="policyTag">75% minimum</span>
             </div>
           </div>
 
@@ -376,7 +395,11 @@ function OverviewBody() {
                           {r.title !== r.code && <span className="attCode">{r.code}</span>}
                         </h4>
                         <p><b>{r.attended}/{r.held}</b> classes</p>
-                        <p className="attSkip">{r.percent >= POLICY * 100 ? `Can miss ${r.canSkip} more classes and stay at 75%` : `Attend ${r.mustAttend ?? 0} consecutive classes to reach 75%`}</p>
+                        <p className="attSkip">{r.held === 0
+                          ? "No classes held yet"
+                          : r.percent >= POLICY * 100
+                            ? `Can miss ${r.canSkip} more classes and stay at 75%`
+                            : `Attend ${r.mustAttend ?? 0} consecutive classes to reach 75%`}</p>
                       </span>
                       <span className="attSubjectActions">
                         <b className={`attPct ${r.percent < POLICY * 100 ? "low" : ""}`}>{r.percent.toFixed(1)}%</b>

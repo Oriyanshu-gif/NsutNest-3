@@ -1,84 +1,38 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { load } from 'cheerio';
-import { safeUpstreamError } from '../../../../../lib/ims-auth-errors';
+import { safeUpstreamError } from '../../../../lib/ims-auth-errors';
 import {
-  IMS_BASE_URL,
-  IMS_COOKIE_NAME,
   encodeImsSession,
+  IMS_COOKIE_NAME,
   imsCookieOptions,
-  pageText,
   readImsSession,
-  requestIms,
-  requestImsImage,
-  type ImsHttpSession,
-} from '../../../../../lib/ims-http';
+} from '../../../../lib/ims-http';
 import {
-  detectImageMimeType,
   discoverProfileUrl,
-  findProfilePrintUrl,
+  fetchImsProfile,
   ImsSessionExpiredError,
-  isImsLoginPage,
-} from '../../../../../lib/ims-profile';
-import { rateLimit, requestKey } from '../../../../../lib/rate-limit';
+} from '../../../../lib/ims-profile';
+import { rateLimit, requestKey } from '../../../../lib/rate-limit';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 /**
- * The IMS "Print Profile" tab is a one-time token that only resolves inside the
- * student's IMS session, so the browser cannot open it directly. This route
- * loads that page with the stored session and hands the HTML back, which is the
- * only way to show the portal's own printout inside NSUT Nest.
+ * Opening My Profile is a few upstream page loads. A cached profile in the
+ * browser means normal navigation does not hit this route, so a modest burst
+ * limit is enough while still stopping a retry loop from hammering IMS.
  */
-const PRINT_LIMIT = { limit: 20, windowMs: 60_000 };
-const MAX_INLINE_IMAGES = 6;
-const MAX_IMAGE_BYTES = 4_000_000;
+const PROFILE_LIMIT = { limit: 30, windowMs: 60_000 };
 
 function clearImsCookie(response: NextResponse) {
   response.cookies.set(IMS_COOKIE_NAME, '', { ...imsCookieOptions(), maxAge: 0 });
   return response;
 }
 
-/**
- * The print page references IMS-hosted assets that a browser cannot fetch
- * without the HttpOnly session cookie, so photographs are inlined as data URLs.
- */
-async function inlineImages(session: ImsHttpSession, html: string, pageUrl: string) {
-  const $ = load(html);
-  const images = $('img[src]').toArray().slice(0, MAX_INLINE_IMAGES);
-  for (const element of images) {
-    const src = $(element).attr('src');
-    if (!src || /^data:/i.test(src)) continue;
-    try {
-      const image = await requestImsImage(session, src, pageUrl);
-      if (!image.bytes.length || image.bytes.length > MAX_IMAGE_BYTES) continue;
-      const type = detectImageMimeType(image.bytes);
-      if (!type) continue;
-      $(element).attr('src', `data:${type};base64,${image.bytes.toString('base64')}`);
-    } catch {
-      // A missing photograph must not stop the portal printout from loading.
-    }
-  }
-  // Any remaining relative link should still point at IMS rather than at us.
-  if (!$('base').length) $('head').prepend(`<base href="${isafer(pageUrl)}">`);
-  return $.html();
-}
-
-/** Only allow the IMS origin in an injected <base href>. */
-function isafer(value: string) {
-  try {
-    const url = new URL(value);
-    return /(^|\.)imsnsit\.org$/i.test(url.hostname) ? url.href : IMS_BASE_URL;
-  } catch {
-    return IMS_BASE_URL;
-  }
-}
-
 export async function GET(request: NextRequest) {
-  const limited = rateLimit(`ims-profile-print:${requestKey(request)}`, PRINT_LIMIT);
+  const limited = rateLimit(`ims-profile:${requestKey(request)}`, PROFILE_LIMIT);
   if (!limited.allowed) {
     return NextResponse.json(
-      { error: 'Too many print attempts. Wait a moment and try again.' },
+      { error: 'Too many profile refreshes. Wait a moment and try again.' },
       { status: 429, headers: { 'Cache-Control': 'no-store', 'Retry-After': String(limited.retryAfterSeconds) } },
     );
   }
@@ -86,7 +40,7 @@ export async function GET(request: NextRequest) {
   const session = readImsSession(request.cookies.get(IMS_COOKIE_NAME)?.value);
   if (!session || session.stage !== 'attendance' || !session.studentRoll) {
     return NextResponse.json(
-      { error: 'Sign in to NSUT IMS to print your profile.' },
+      { error: 'Sign in to NSUT IMS to view your profile.' },
       { status: 401, headers: { 'Cache-Control': 'no-store' } },
     );
   }
@@ -97,37 +51,15 @@ export async function GET(request: NextRequest) {
       throw new Error('The IMS My Profile link is not available in this session. Sync your IMS attendance and try again.');
     }
 
-    const profilePage = await requestIms(session, profileUrl, { referer: IMS_BASE_URL });
-    if (isImsLoginPage(profilePage.html)) throw new ImsSessionExpiredError();
+    const profile = await fetchImsProfile(session, profileUrl);
+    const response = NextResponse.json(profile, { headers: { 'Cache-Control': 'no-store' } });
 
-    const printUrl = findProfilePrintUrl(profilePage.html, profilePage.url);
-    if (!printUrl) {
-      throw new Error('IMS did not offer a Print Profile link for this session. Sync your IMS attendance and try again.');
-    }
-
-    const printPage = await requestIms(session, printUrl, { referer: profilePage.url });
-    if (isImsLoginPage(printPage.html)) throw new ImsSessionExpiredError();
-
-    const text = pageText(printPage.html);
-    if (!text || /invalid operation/i.test(text)) {
-      throw new Error('IMS refused the Print Profile request for this session. Sign in again and retry.');
-    }
-
-    const html = await inlineImages(session, printPage.html, printPage.url);
-    const response = new NextResponse(html, {
-      headers: {
-        'Content-Type': 'text/html; charset=utf-8',
-        'Cache-Control': 'no-store',
-        'X-Frame-Options': 'SAMEORIGIN',
-        'Content-Security-Policy': "default-src 'none'; img-src data:; style-src 'unsafe-inline' https://www.imsnsit.org; base-uri https://www.imsnsit.org",
-      },
-    });
-
-    // Persist any cookies IMS refreshed, without failing a good printout.
+    // Persist the newly discovered link and any cookies IMS refreshed, but never
+    // fail an otherwise successful profile read if the cookie is at its limit.
     try {
       response.cookies.set(IMS_COOKIE_NAME, encodeImsSession(session), imsCookieOptions());
     } catch {
-      // The current cookie still holds a valid session.
+      // The current cookie still holds a valid session; the link is rediscovered next time.
     }
     return response;
   } catch (error) {
@@ -137,7 +69,15 @@ export async function GET(request: NextRequest) {
         { status: 401, headers: { 'Cache-Control': 'no-store' } },
       ));
     }
-    const safe = safeUpstreamError(error, 'Could not open the IMS printout right now. Please try again.');
+
+    const safe = safeUpstreamError(error, 'Could not load your IMS profile right now. Please try again.');
+    // A missing My Profile link is a flow problem rather than a portal outage.
+    if (/My Profile link is not available/i.test(error instanceof Error ? error.message : '')) {
+      return NextResponse.json(
+        { error: 'Could not find My Profile in your IMS session. Sync your IMS attendance and try again.' },
+        { status: 409, headers: { 'Cache-Control': 'no-store' } },
+      );
+    }
     return NextResponse.json(
       { error: safe.message },
       { status: safe.status, headers: { 'Cache-Control': 'no-store' } },

@@ -233,14 +233,18 @@ export default function Community() {
                         {picked ? <Check size={16} /> : <Users size={15} />}
                       </span>
                     </button>
-                    <a
-                      className="cmSceneLink"
-                      href={sceneThreads(scene.q)}
-                      target="_blank"
-                      rel="noreferrer noopener"
-                    >
-                      r/NSUT threads <ArrowUpRight size={12} />
-                    </a>
+                    {/* One link per card made nine identical "threads" links;
+                        the selected scene is the one that actually needs it. */}
+                    {picked && (
+                      <a
+                        className="cmSceneLink"
+                        href={sceneThreads(scene.q)}
+                        target="_blank"
+                        rel="noreferrer noopener"
+                      >
+                        Open r/NSUT threads <ArrowUpRight size={12} />
+                      </a>
+                    )}
                   </div>
                 );
               })}

@@ -9,7 +9,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Search, Trophy, ChevronDown, Loader2, TriangleAlert, GraduationCap, ArrowUpRight, RotateCcw, Layers } from "lucide-react";
+import { Search, Trophy, ChevronDown, Loader2, TriangleAlert, GraduationCap, ArrowUpRight, RotateCcw } from "lucide-react";
 import {
   SEMESTERS, academicYearLabel, examPeriod, loadStudents, sgpaLabel, type Student,
 } from "../../lib/data";
@@ -128,7 +128,6 @@ function ResultsBoard() {
           <h1>Results<span className="rsAccent">, ranked</span>.</h1>
           <p>Every semester gazette and CGPA table, searchable by name, roll number, batch or branch.</p>
         </div>
-        <span className="rsHeadChip"><Layers size={14} />{students ? `${board.length.toLocaleString("en-IN")} in view` : "Loading records"}</span>
       </header>
 
       <section className="hubCard rsFilterPanel">
