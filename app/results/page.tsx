@@ -124,8 +124,8 @@ function ResultsBoard() {
     <main className="rsShell">
       <header className="rsHead">
         <div>
-          <small className="panelKicker">NSUT GAZETTE · B.TECH RESULTS</small>
-          <h1>Results<span className="rsAccent">, ranked</span>.</h1>
+          <small className="panelKicker">Gazette · B.Tech results</small>
+          <h1>Results<span className="rsAccent">, ranked</span></h1>
           <p>Every semester gazette and CGPA table, searchable by name, roll number, batch or branch.</p>
         </div>
       </header>
@@ -134,7 +134,7 @@ function ResultsBoard() {
         <label className="rsSearch">
           <Search size={18} />
           <input value={query} onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search by student name, roll number or branch…"
+            placeholder="Search by name, roll number or branch"
             aria-label="Search students by name, roll number or branch" />
           {query && <button onClick={() => setQuery("")} aria-label="Clear search">×</button>}
         </label>
@@ -173,7 +173,7 @@ function ResultsBoard() {
           <div className="rsBoardTitle">
             <span className="rsTrophy"><Trophy size={16} /></span>
             <div>
-              <small className="panelKicker">STUDENT LEADERBOARD</small>
+              <small className="panelKicker">Student leaderboard</small>
               <h2>{semesterFilter === null ? "Ranked by total CGPA" : `Ranked by semester ${semesterFilter} SGPA`}</h2>
             </div>
           </div>
@@ -234,7 +234,7 @@ function ResultsBoard() {
                     </div>
                     {semesterFilter !== null && e.record && (
                       <div className="rsSemMeta">
-                        <span className="rsSemBadge">SEM {semesterFilter}</span>
+                        <span className="rsSemBadge">Sem {semesterFilter}</span>
                         <span className="rsSemYear">{academicYearLabel(e.record.ay)}</span>
                       </div>
                     )}

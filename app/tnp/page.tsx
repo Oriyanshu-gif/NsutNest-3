@@ -1,6 +1,6 @@
 "use client";
 
-import { Briefcase, Building2, ExternalLink, GraduationCap, Mail, Phone, Sparkles, Users } from "lucide-react";
+import { Briefcase, Building2, ExternalLink, GraduationCap, Mail, Phone, Users } from "lucide-react";
 import HubShell from "../hub-shell";
 
 const TNP_SITE = "https://www.tnpnsut.in/";
@@ -18,7 +18,7 @@ export default function Tnp() {
       <main className="tnpShell">
         <header className="tnpHeader">
           <div>
-            <small className="panelKicker">CAREER OPPORTUNITIES</small>
+            <small className="panelKicker">Career opportunities</small>
             <h1>Training &amp; Placement</h1>
             <p>Official NSUT T&amp;P links are live. The searchable placement and internship dataset is being prepared and will appear here.</p>
           </div>
@@ -34,8 +34,8 @@ export default function Tnp() {
         </section>
 
         <section className="hubCard tnpComingSoon">
-          <span className="tnpComingSoonIcon"><Sparkles size={26} /></span>
-          <small className="panelKicker">PLACEMENT DATASET</small>
+          <span className="tnpComingSoonIcon"><Building2 size={24} /></span>
+          <small className="panelKicker">Placement dataset</small>
           <h2>Coming soon</h2>
           <p>
             We&apos;re reviewing and tidying the placement and internship records before publishing them here. Until
@@ -44,7 +44,7 @@ export default function Tnp() {
         </section>
 
         <section className="hubCard tnpContact">
-          <div className="panelKicker">REACH THE CELL</div><h2>Contact the Training &amp; Placement cell</h2>
+          <div className="panelKicker">Reach the cell</div><h2>Contact the Training &amp; Placement cell</h2>
           <p>Confirm current openings, eligibility and official placement information with NSUT’s Training &amp; Placement Cell.</p>
           <div className="tnpContactRows">
             <a href="mailto:placements@nsut.ac.in"><Mail size={15} /> placements@nsut.ac.in</a>

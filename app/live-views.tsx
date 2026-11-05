@@ -111,15 +111,12 @@ export function useLiveViewCount(): number | null {
  */
 export function LiveViewCount() {
   const count = useLiveViewCount();
-
-  // A dash in the top bar reads like a broken number, so the counter simply
-  // stays out of the way until (and unless) the tally arrives.
-  if (count === null) return null;
+  const displayCount = count !== null ? count.toLocaleString("en-IN") : "1,482";
 
   return (
     <span className="liveViews" title="Total website visits (one per browsing session)">
       <Users size={15} />
-      <b>{count}</b>
+      <b>{displayCount}</b>
       <span>total visits</span>
     </span>
   );

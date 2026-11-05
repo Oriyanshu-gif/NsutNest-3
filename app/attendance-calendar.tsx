@@ -83,7 +83,7 @@ export function SubjectAttendanceCalendar({
     <div className="attendanceCalendar" aria-label={`${subject.title} attendance calendar`}>
       <div className="attendanceCalendarTop">
         <div className="attendanceCalendarSubject">
-          <small>DATE-WISE ATTENDANCE</small>
+          <small>Date-wise attendance</small>
           <b>{subject.title}</b>
           {subject.title !== subject.code && <span className="attCode">{subject.code}</span>}
         </div>

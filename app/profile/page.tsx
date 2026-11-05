@@ -218,7 +218,7 @@ function MyProfileBody() {
     <div className="myProfilePage">
       <header className="myProfileToolbar">
         <div>
-          <small className="myProfileKicker">MY PROFILE · NSUT IMS</small>
+          <small className="myProfileKicker">My profile · NSUT IMS</small>
           <h1>Student Profile</h1>
           <p>Your details and photograph, straight from IMS.</p>
         </div>
@@ -281,7 +281,7 @@ function MyProfileBody() {
             </div>
 
             <div className="myProfileIdentity">
-              <small>NETAJI SUBHAS UNIVERSITY OF TECHNOLOGY</small>
+              <small>Netaji Subhas University of Technology</small>
               <h2>{fullName}</h2>
               <p>{profile.studentId || profile.roll}</p>
               {chips.length > 0 && (
@@ -292,7 +292,7 @@ function MyProfileBody() {
             </div>
           </header>
 
-          <div className="myProfileSectionLabel">STUDENT PROFILE</div>
+          <div className="myProfileSectionLabel">Student profile</div>
 
           <dl className="myProfileDetails">
             {profile.fields.map((field, index) => (

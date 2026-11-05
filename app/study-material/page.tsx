@@ -68,7 +68,7 @@ function StudyMaterialBody() {
     <main className="studyShell">
       <header className="studyHeader">
         <div>
-          <small className="panelKicker">LEARN SMARTER</small>
+          <small className="panelKicker">Coursework &amp; subjects</small>
           <h1>Study material</h1>
           <p>Your IMS semester subjects in one place. Notes, PYQs and syllabus are being prepared.</p>
         </div>

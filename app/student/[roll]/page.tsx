@@ -109,7 +109,7 @@ export default function StudentProfile() {
 
   const shell = (children: React.ReactNode) => (
     <main className="profileShell">
-      <Link href="/" className="backLink"><ArrowLeft size={16} /> Back to results</Link>
+      <Link href="/results" className="backLink"><ArrowLeft size={16} /> Back to results</Link>
       {children}
       <footer className="profileFooter">
         <BrandLogo compact />
@@ -133,7 +133,7 @@ export default function StudentProfile() {
     <section className="profilePanel">
       <h1>Student not found</h1>
       <p>No record found for roll number {roll}.</p>
-      <Link className="blueButton" href="/">Return to results</Link>
+      <Link className="blueButton" href="/results">Return to results</Link>
     </section>,
   );
 
@@ -158,27 +158,27 @@ export default function StudentProfile() {
 
       <section className="metricGrid">
         <div className="metric greenMetric">
-          <small>TOTAL CGPA</small>
+          <small>Total CGPA</small>
           <b>{officialCgpa === null ? "—" : officialCgpa.toFixed(2)}</b>
           <span>{officialCgpa === null ? "Not in the CGPA tables" : "Cumulative · university CGPA table"}</span>
         </div>
         <div className="metric greenMetric">
-          <small>BEST SEMESTER</small>
+          <small>Best semester</small>
           <b>{highest ? highest.sgpa.toFixed(2) : "—"}</b>
           <span>{highest ? `Semester ${highest.sem}` : "No SGPA available"}</span>
         </div>
         <div className="metric">
-          <small>OVERALL RANK</small>
+          <small>Overall rank</small>
           <b>{rank ? `#${rank}` : "—"}</b>
           <span>{ranking ? `Of ${ranking.rankedStudents.toLocaleString("en-IN")} students by total CGPA` : "Unavailable"}</span>
         </div>
         <div className="metric">
-          <small>BRANCH RANK</small>
+          <small>Branch rank</small>
           <b>{branchRank ? `#${branchRank}` : "—"}</b>
           <span>Within {student.branch}</span>
         </div>
         <div className="metric">
-          <small>SEMESTERS FOUND</small>
+          <small>Semesters found</small>
           <b>{semesterMap.size}/8</b>
           <span>{markedSemesters.length} with subject marks</span>
         </div>

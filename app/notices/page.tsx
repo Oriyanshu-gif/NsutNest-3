@@ -63,7 +63,7 @@ export default function NoticesPage() {
 
   return (
     <main className="profileShell">
-      <Link href="/" className="backLink"><ArrowLeft size={16} /> Back to results</Link>
+      <Link href="/" className="backLink"><ArrowLeft size={16} /> Back to dashboard</Link>
 
       <header className="profileHero">
         <div className="profileAvatar"><Bell size={30} /></div>
@@ -104,7 +104,7 @@ export default function NoticesPage() {
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search by title, department or who published it..."
+            placeholder="Search title or department"
           />
           {query && <button onClick={() => setQuery("")} aria-label="Clear search">×</button>}
         </label>
@@ -148,7 +148,7 @@ export default function NoticesPage() {
                     <span>{monthYear(n.isoDate)}</span>
                   </time>
                   <div className="noticeBody">
-                    <h3>{n.title}{isRecentNotice(n.isoDate) && <span className="newBadge">NEW</span>}</h3>
+                    <h3>{n.title}{isRecentNotice(n.isoDate) && <span className="newBadge">New</span>}</h3>
                     <p>{n.publishedBy}</p>
                   </div>
                   <ExternalLink size={15} className="noticeIcon" />

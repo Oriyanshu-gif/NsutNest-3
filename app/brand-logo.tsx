@@ -17,7 +17,7 @@ export default function BrandLogo({ compact = false }: BrandLogoProps) {
       />
       <span className="nsutNestWordmark">
         <b>Nsut<span>Nest</span></b>
-        {!compact && <small>YOUR CAMPUS, ALL IN ONE PLACE</small>}
+        {!compact && <small>Campus portal</small>}
       </span>
     </span>
   );

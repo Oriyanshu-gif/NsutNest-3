@@ -419,7 +419,7 @@ export function ImsLoginGate() {
     {((open && !attendance) || syncing) && <div className="imsGateBackdrop" role="dialog" aria-modal="true" aria-labelledby="imsGateTitle">
       <form className="imsGateCard" onSubmit={submit}>
         <div className="imsGateMark"><LockKeyhole size={23}/></div>
-        <div className="imsGateEyebrow">{confirmation ? "VERIFY ATTENDANCE PERIOD" : syncing ? (printing ? "IMS SIGN-IN" : "REFRESH SAVED ATTENDANCE") : "SECURE STUDENT ACCESS"}</div>
+        <div className="imsGateEyebrow">{confirmation ? "Verify attendance period" : syncing ? (printing ? "IMS sign-in" : "Refresh saved attendance") : "IMS portal sign-in"}</div>
         <h2 id="imsGateTitle">{confirmation ? "Confirm your IMS selection" : syncing ? (printing ? "Sign in to print your profile" : "Refresh IMS attendance") : "Connect to NSUT IMS"}</h2>
         {confirmation ? <>
           <p className="imsGateIntro">{confirmation.message} Pick from the options IMS returned.</p>

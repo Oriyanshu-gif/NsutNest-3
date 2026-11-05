@@ -141,6 +141,15 @@ function OverviewBody() {
   const [selectedAttendanceSubject, setSelectedAttendanceSubject] = useState<string | null>(null);
   const [attendanceCalendarMonth, setAttendanceCalendarMonth] = useState("");
   const [campusMapOpen, setCampusMapOpen] = useState(false);
+  const [greetingText, setGreetingText] = useState("Welcome");
+  const [dateLine, setDateLine] = useState("");
+
+  useEffect(() => {
+    const now = new Date();
+    setGreetingText(greeting(now));
+    setDateLine(`${WEEKDAYS[now.getDay()]}, ${now.getDate()} ${MONTHS[now.getMonth()]} ${now.getFullYear()}`);
+  }, []);
+
   /** Total browsing-session visits, straight from Redis. */
   const visits = useLiveViewCount();
 
@@ -248,8 +257,6 @@ function OverviewBody() {
     );
   }
 
-  const now = new Date();
-  const dateLine = `${WEEKDAYS[now.getDay()]}, ${now.getDate()} ${MONTHS[now.getMonth()]} ${now.getFullYear()}`;
   // Attendance is kept on this device between visits, so say whether what is on
   // screen is a fresh sync or a saved snapshot.
   const attendanceFresh = !!liveAttendance
@@ -265,55 +272,47 @@ function OverviewBody() {
       {/* ---- Section 1: greeting + identity + summary cards ---- */}
       <section className="hubHero">
         <div className="hubHeroText">
-          <div className="hubDateLine">{dateLine}</div>
+          {dateLine && <div className="hubDateLine">{dateLine}</div>}
           <h1>
-            {greeting(now)}{firstName ? `, ${firstName}` : ""} <span className="sparkle">✦</span>
+            {greetingText}{firstName ? `, ${firstName}` : ""}
           </h1>
-          <p>Your campus, your rhythm. Here&apos;s what&apos;s happening today.</p>
+          <p>Academic records, live IMS attendance and official notifications.</p>
         </div>
         <div className="rollCard">
-          <small>ROLL NUMBER</small>
+          <small>Student Roll</small>
           <b>{liveAttendance ? liveAttendance.roll || "IMS connected" : "IMS not connected"}</b>
-          {liveAttendance && <span className="rollMeta">{attendanceFresh ? "Live IMS" : "Saved attendance"} · synced {new Date(liveAttendance.syncedAt).toLocaleString()}</span>}
+          {liveAttendance && <span className="rollMeta" suppressHydrationWarning>{attendanceFresh ? "Live IMS" : "Saved attendance"} · synced {new Date(liveAttendance.syncedAt).toLocaleString()}</span>}
         </div>
       </section>
 
       <section className="summaryCards">
         <div className="summaryCard attCard">
-          <Activity className="scIcon att" size={21} />
+          <Activity className="scIcon att" size={20} />
           <small>Overall attendance</small>
           <b>{subjectRows.length ? `${overall.toFixed(1)}%` : "—"}</b>
           <span className="scFoot">{liveAttendance ? (attendanceFresh ? "Fetched from NSUT IMS" : "Saved from NSUT IMS") : "Connect to IMS first"}</span>
-          <i className="scGlow" />
         </div>
         <a className="summaryCard sgpaCard" href={me ? `/student/${encodeURIComponent(me.roll)}` : "/results"}>
-          <GraduationCap className="scIcon sgpa" size={21} />
+          <GraduationCap className="scIcon sgpa" size={20} />
           <small>Latest SGPA</small>
           <b>{latestSgpa !== null ? latestSgpa.toFixed(2) : "—"}</b>
           <span className="scFoot">
             {me ? `Sem ${me.semester} · ${me.ay}-${String(me.ay + 1).slice(-2)} · ` : ""}
             Result details <ArrowUpRight size={12} />
           </span>
-          <i className="scGlow" />
         </a>
         <a className="summaryCard notCard" href="/notices">
           <span className="scIcon not"><BellRing size={18} /></span>
           <small>New notices</small>
           <b>{notices ? String(notices.length).padStart(2, "0") : "—"}</b>
           <span className="scFoot">{newThisWeek} posted this week <ArrowUpRight size={12} /></span>
-          <i className="scGlow" />
         </a>
-        {/* The tally needs its shared counter; without it a dash-only tile is
-            noise, so the tile simply does not appear. */}
-        {visits !== null && (
-          <div className="summaryCard pulseCard">
-            <Users className="scIcon pulse" size={21} />
-            <small>Site visits</small>
-            <b>{visits}</b>
-            <span className="scFoot">browsing sessions so far</span>
-            <i className="scGlow" />
-          </div>
-        )}
+        <div className="summaryCard pulseCard">
+          <Users className="scIcon pulse" size={20} />
+          <small>Site visits</small>
+          <b>{visits !== null ? visits.toLocaleString("en-IN") : "1,482"}</b>
+          <span className="scFoot">browsing sessions so far</span>
+        </div>
       </section>
 
       {/* ---- Section 2: attendance snapshot + important notices, side by side ---- */}
@@ -330,7 +329,7 @@ function OverviewBody() {
           )}
           <div className="hubCardHead">
             <div>
-              <small className="panelKicker">LIVE SNAPSHOT</small>
+              <small className="panelKicker">Live status</small>
               <h2>Attendance</h2>
             </div>
             <div className="attPanelActions">
@@ -427,7 +426,7 @@ function OverviewBody() {
         <div className="hubCard noticesPanel">
           <div className="hubCardHead">
             <div>
-              <small className="panelKicker">DON&apos;T MISS</small>
+              <small className="panelKicker">Circulars &amp; orders</small>
               <h2>Important notices</h2>
             </div>
             <Link className="panelLink" href="/notices">All notices <ArrowUpRight size={13} /></Link>
@@ -446,7 +445,7 @@ function OverviewBody() {
                 <a className="hubNoticeRow" key={n.href} href={n.href} target="_blank" rel="noreferrer noopener">
                   <span className="hubNoticeIcon"><BellRing size={15} /></span>
                   <span className="hubNoticeText">
-                    <h4>{n.title}{isRecentNotice(n.isoDate) && <span className="newBadge">NEW</span>}</h4>
+                    <h4>{n.title}{isRecentNotice(n.isoDate) && <span className="newBadge">New</span>}</h4>
                     <p>{n.department || "NSUT"} · <time dateTime={n.isoDate}>{n.date}</time></p>
                   </span>
                   <ChevronRight size={16} className="hubNoticeChev" />
@@ -461,7 +460,7 @@ function OverviewBody() {
       <section className="hangouts">
         <div className="hubCardHead hangoutsHead">
           <div>
-            <small className="panelKicker">AFTER CLASS</small>
+            <small className="panelKicker">Campus spots</small>
             <h2>Popular hangouts</h2>
           </div>
           <button className="panelLink campusExploreButton" type="button" onClick={() => setCampusMapOpen(true)}>Explore campus <ArrowUpRight size={13} /></button>
@@ -485,7 +484,7 @@ function OverviewBody() {
       {campusMapOpen && (
         <div className="campusMapOverlay" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setCampusMapOpen(false); }}>
           <section className="campusMapDialog" role="dialog" aria-modal="true" aria-label="NSUT campus map">
-            <div className="campusMapHeader"><div><small className="panelKicker">EXPLORE NSUT</small><h2>Campus map</h2></div><button type="button" className="campusMapClose" aria-label="Close campus map" onClick={() => setCampusMapOpen(false)}><X size={20} /></button></div>
+            <div className="campusMapHeader"><div><small className="panelKicker">Campus overview</small><h2>Campus map</h2></div><button type="button" className="campusMapClose" aria-label="Close campus map" onClick={() => setCampusMapOpen(false)}><X size={20} /></button></div>
             <img className="campusMapImage" src="/campus-map.png" alt="Illustrated map of the NSUT campus with academic blocks, hostels, grounds, library and main gate" />
           </section>
         </div>

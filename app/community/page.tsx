@@ -174,7 +174,7 @@ export default function Community() {
       <main className="cmShell">
         <section className="cmHero">
           <div>
-            <span className="panelKicker">CAMPUS SOCIAL</span>
+            <span className="panelKicker">Campus social</span>
             <h1>Community</h1>
             <p>
               Find the people who are into what you are into, ask the campus the question the
@@ -193,9 +193,9 @@ export default function Community() {
             </div>
           </div>
           <div className="cmPulse">
-            <div><small>WHERE CAMPUS TALKS</small><b>r/NSUT_Delhi</b></div>
-            <div><small>FEST SEASON</small><b>Moksha, every March</b></div>
-            <div><small>ON CAMPUS</small><b>Moksha · Innovision · Resonanz</b></div>
+            <div><small>Where campus talks</small><b>r/NSUT_Delhi</b></div>
+            <div><small>Fest season</small><b>Moksha, every March</b></div>
+            <div><small>On campus</small><b>Moksha · Innovision · Resonanz</b></div>
           </div>
         </section>
 
@@ -204,7 +204,7 @@ export default function Community() {
           <section className="cmCard" aria-labelledby="cmScenesTitle">
             <div className="cmCardHead">
               <div>
-                <span className="panelKicker">PICK WHAT YOU&apos;RE INTO</span>
+                <span className="panelKicker">Pick your interests</span>
                 <h2 id="cmScenesTitle">Find your people</h2>
                 <p>Tap the scenes that sound like you. They are saved on this device, no account needed.</p>
               </div>
@@ -293,7 +293,7 @@ export default function Community() {
             </section>
 
             <section className="cmCard cmFest" aria-labelledby="cmFestTitle">
-              <span className="panelKicker">FEST SEASON</span>
+              <span className="panelKicker">Fest season</span>
               <h2 id="cmFestTitle">Moksha &amp; friends</h2>
               <p>
                 <b>Moksha</b> has run every year since 2003, usually over three days in March:
@@ -324,7 +324,7 @@ export default function Community() {
         <section className="cmCard" aria-labelledby="cmComposeTitle">
           <div className="cmCardHead">
             <div>
-              <span className="panelKicker">SAY IT ON THE FEED</span>
+              <span className="panelKicker">Ask &amp; share</span>
               <h2 id="cmComposeTitle">Ask the campus</h2>
               <p>
                 Write your post here, then finish it on Reddit. The right template is filled in for
@@ -381,7 +381,7 @@ export default function Community() {
         <section aria-labelledby="cmGalleryTitle">
           <div className="cmCardHead cmGalleryHead">
             <div>
-              <span className="panelKicker">CAMPUS FRAMES</span>
+              <span className="panelKicker">Campus gallery</span>
               <h2 id="cmGalleryTitle">Shot by Junoon</h2>
               <p>Fest and campus photography from NSUT&apos;s photography club.</p>
             </div>
@@ -427,7 +427,7 @@ export default function Community() {
         >
           <section className="campusMapDialog" role="dialog" aria-modal="true" aria-label="NSUT campus map">
             <div className="campusMapHeader">
-              <div><small className="panelKicker">EXPLORE NSUT</small><h2>Campus map</h2></div>
+              <div><small className="panelKicker">Campus overview</small><h2>Campus map</h2></div>
               <button type="button" className="campusMapClose" aria-label="Close campus map" onClick={() => setMapOpen(false)}>
                 <X size={20} />
               </button>
