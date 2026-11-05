@@ -310,7 +310,7 @@ function OverviewBody() {
         <div className="summaryCard pulseCard">
           <Users className="scIcon pulse" size={20} />
           <small>Site visits</small>
-          <b>{visits !== null ? visits.toLocaleString("en-IN") : "1,482"}</b>
+          <b>{visits !== null ? visits.toLocaleString("en-IN") : "—"}</b>
           <span className="scFoot">browsing sessions so far</span>
         </div>
       </section>

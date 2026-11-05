@@ -38,6 +38,27 @@ function readClientId(): string {
   }
 }
 
+const LIVE_VIEW_CACHE_KEY = "nsutnest:cached-views-total";
+
+function readCachedLiveViews(): number | null {
+  try {
+    const raw = typeof window !== "undefined" ? window.localStorage.getItem(LIVE_VIEW_CACHE_KEY) : null;
+    if (!raw) return null;
+    const n = Number(raw);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeCachedLiveViews(total: number) {
+  try {
+    if (typeof window !== "undefined" && Number.isFinite(total) && total > 0) {
+      window.localStorage.setItem(LIVE_VIEW_CACHE_KEY, String(total));
+    }
+  } catch {}
+}
+
 /**
  * How many website visits have been recorded so far.
  *
@@ -49,6 +70,9 @@ export function useLiveViewCount(): number | null {
 
   useEffect(() => {
     let active = true;
+    const cached = readCachedLiveViews();
+    if (cached !== null) setCount(cached);
+
     const clientId = readClientId();
 
     async function refresh(register = false) {
@@ -63,7 +87,10 @@ export function useLiveViewCount(): number | null {
         });
         if (!res.ok) return;
         const body = (await res.json()) as { count?: number };
-        if (active && typeof body.count === "number") setCount(body.count);
+        if (active && typeof body.count === "number") {
+          setCount(body.count);
+          writeCachedLiveViews(body.count);
+        }
       } catch {
         // Offline or the route is unreachable: keep the last number on screen.
       }
@@ -82,7 +109,10 @@ export function useLiveViewCount(): number | null {
         });
         if (!res.ok) return;
         const body = await res.json() as { count?: number };
-        if (active && typeof body.count === "number") setCount(body.count);
+        if (active && typeof body.count === "number") {
+          setCount(body.count);
+          writeCachedLiveViews(body.count);
+        }
         if (register) { try { window.sessionStorage.setItem(SESSION_KEY, "1"); } catch {} }
       } catch {}
     }
@@ -111,12 +141,13 @@ export function useLiveViewCount(): number | null {
  */
 export function LiveViewCount() {
   const count = useLiveViewCount();
-  const displayCount = count !== null ? count.toLocaleString("en-IN") : "1,482";
+
+  if (count === null) return null;
 
   return (
     <span className="liveViews" title="Total website visits (one per browsing session)">
       <Users size={15} />
-      <b>{displayCount}</b>
+      <b>{count.toLocaleString("en-IN")}</b>
       <span>total visits</span>
     </span>
   );

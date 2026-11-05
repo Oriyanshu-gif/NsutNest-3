@@ -8,7 +8,7 @@ const TOTAL_VISITS_KEY = "nsut-nest:total-visits";
 const noStore = { "cache-control": "no-store" } as const;
 
 // Fallback in-memory visit store when Upstash Redis is not configured (e.g. local dev / preview)
-let localVisitCount = 1482;
+let localVisitCount = 0;
 const localVisitors = new Set<string>();
 
 async function redis(command: (string | number)[]): Promise<number> {
