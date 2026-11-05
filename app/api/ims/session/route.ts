@@ -39,28 +39,45 @@ export async function POST(request: NextRequest) {
     };
 
     await requestIms(session, IMS_BASE_URL);
-    const studentPage = await requestIms(session, new URL('student.htm', IMS_BASE_URL).href);
-    const $student = load(studentPage.html);
-    // IMS has changed its frameset over time. The login form is not guaranteed
-    // to be in the first frame, so inspect every same-portal frame until the
-    // actual password form is found.
-    const frameUrls = $student('frame[src], iframe[src]').toArray()
-      .map(frame => $student(frame).attr('src'))
-      .filter((src): src is string => Boolean(src));
-    const candidates = [...frameUrls, 'student_login.php'];
+
     let loginPage: Awaited<ReturnType<typeof requestIms>> | null = null;
     let loginForm: ReturnType<typeof pageForms>[number] | undefined;
-    for (const frameUrl of [...new Set(candidates)]) {
-      try {
-        const page = await requestIms(session, frameUrl, { referer: studentPage.url });
-        const form = pageForms(page.html).find(candidate => /type\s*=\s*["']?password/i.test(candidate.html));
-        if (form) {
-          loginPage = page;
-          loginForm = form;
-          break;
+
+    // Fast path: In NSUT IMS, student_login110.php is the actual frame hosting the student login form.
+    // Requesting it directly with the session and referer saves 2-3 extra round-trips.
+    try {
+      const direct = await requestIms(session, 'student_login110.php', { referer: new URL('student.htm', IMS_BASE_URL).href });
+      const directForm = pageForms(direct.html).find(candidate => /type\s*=\s*["']?password/i.test(candidate.html));
+      if (directForm) {
+        loginPage = direct;
+        loginForm = directForm;
+      }
+    } catch {
+      // Direct request failed; fall back to frameset discovery below.
+    }
+
+    if (!loginPage || !loginForm) {
+      const studentPage = await requestIms(session, new URL('student.htm', IMS_BASE_URL).href);
+      const $student = load(studentPage.html);
+      // IMS has changed its frameset over time. The login form is not guaranteed
+      // to be in the first frame, so inspect every same-portal frame until the
+      // actual password form is found.
+      const frameUrls = $student('frame[src], iframe[src]').toArray()
+        .map(frame => $student(frame).attr('src'))
+        .filter((src): src is string => Boolean(src));
+      const candidates = [...frameUrls, 'student_login110.php', 'student_login.php'];
+      for (const frameUrl of [...new Set(candidates)]) {
+        try {
+          const page = await requestIms(session, frameUrl, { referer: studentPage.url });
+          const form = pageForms(page.html).find(candidate => /type\s*=\s*["']?password/i.test(candidate.html));
+          if (form) {
+            loginPage = page;
+            loginForm = form;
+            break;
+          }
+        } catch {
+          // One obsolete or unrelated frame should not prevent checking others.
         }
-      } catch {
-        // One obsolete or unrelated frame should not prevent checking others.
       }
     }
     if (!loginPage || !loginForm) {

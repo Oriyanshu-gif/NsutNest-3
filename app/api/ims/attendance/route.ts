@@ -121,17 +121,30 @@ function rememberProfileLink(session: ImsHttpSession, pages: ImsHttpPage[]) {
 }
 
 async function navigateAfterLogin(session: ImsHttpSession, loginResponse: ImsHttpPage) {
-  let pages = await readImsFrames(session, loginResponse.url);
+  let pages = await readImsFrames(session, loginResponse.url, undefined, 24, loginResponse);
   rememberProfileLink(session, [{ url: loginResponse.url, html: loginResponse.html }, ...pages]);
   const activities = findLink(pages, /^My Activities$/i);
   if (!activities) throw new Error('Login succeeded, but the IMS My Activities link was not found in its returned pages.');
+
   const activitiesPage = await requestIms(session, activities.url, { referer: activities.page.url });
-  pages = await readImsFrames(session, activitiesPage.url, activities.page.url);
-  rememberProfileLink(session, pages);
-  const attendance = findLink(pages, /^My Attendance$/i);
+  // Fast path: My Attendance link is often directly on activitiesPage without needing to crawl its subframes
+  let attendance = findLink([activitiesPage], /^My Attendance$/i);
+  if (!attendance) {
+    pages = await readImsFrames(session, activitiesPage.url, activities.page.url, 12, activitiesPage);
+    rememberProfileLink(session, pages);
+    attendance = findLink(pages, /^My Attendance$/i);
+  } else {
+    rememberProfileLink(session, [activitiesPage]);
+  }
   if (!attendance) throw new Error('The IMS attendance link is not available after opening My Activities.');
+
   const attendancePage = await requestIms(session, attendance.url, { referer: attendance.page.url });
-  pages = await readImsFrames(session, attendancePage.url, attendance.page.url);
+  // Fast path: If the attendance dropdown controls are directly on attendancePage, skip walking subframes
+  if (readControls([attendancePage])) {
+    pages = [attendancePage];
+  } else {
+    pages = await readImsFrames(session, attendancePage.url, attendance.page.url, 12, attendancePage);
+  }
   rememberProfileLink(session, pages);
   session.navigationUrls = [...new Set([attendancePage.url, ...pages.map(page => page.url)])];
   return pages;

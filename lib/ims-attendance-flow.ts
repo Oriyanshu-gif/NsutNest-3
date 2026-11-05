@@ -183,9 +183,15 @@ export async function submitAttendance(
     referer: controls.page.url,
     body: fields,
   });
-  const pages = await readImsFrames(session, page.url, controls.page.url);
-  const resultPages = [{ url: page.url, html: page.html }, ...pages];
-  const tables = resultTables(resultPages);
+  // Fast path: in IMS, the attendance table is almost always returned in the direct response.
+  // Checking it first avoids re-requesting page.url and crawling subframes.
+  let tables = resultTables([{ url: page.url, html: page.html }]);
+  let resultPages = [{ url: page.url, html: page.html }];
+  if (!tables.length) {
+    const pages = await readImsFrames(session, page.url, controls.page.url, 12, page);
+    resultPages = [{ url: page.url, html: page.html }, ...pages];
+    tables = resultTables(resultPages);
+  }
   if (!tables.length) throw new Error('The IMS response did not contain attendance tables. The portal may require browser-side form logic or its layout may have changed.');
   const subjectCodes = subjectCodesFromTables(tables);
   const pageNames = subjectNamesFromPages(resultPages, tables, subjectCodes);

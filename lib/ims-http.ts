@@ -200,27 +200,57 @@ export async function readImsFrames(
   url: string,
   referer = IMS_BASE_URL,
   maxPages = 24,
+  initialPage?: ImsHttpPage,
 ): Promise<ImsHttpPage[]> {
   const pages: ImsHttpPage[] = [];
-  const queued = [{ url, referer }];
+  const queued: { url: string; referer: string }[] = [];
   const visited = new Set<string>();
-  while (queued.length && pages.length < maxPages) {
-    const next = queued.shift()!;
-    const page = await requestIms(session, next.url, { referer: next.referer });
-    if (visited.has(page.url)) continue;
-    visited.add(page.url);
-    pages.push({ url: page.url, html: page.html });
-    const $ = load(page.html);
+
+  if (initialPage && (initialPage.url === url || !url)) {
+    visited.add(initialPage.url);
+    pages.push(initialPage);
+    const $ = load(initialPage.html);
     $('frame[src], iframe[src]').each((_, element) => {
       const src = $(element).attr('src');
       if (!src || /^javascript:/i.test(src)) return;
       try {
-        const frameUrl = safeImsUrl(src, page.url).href;
-        if (!visited.has(frameUrl)) queued.push({ url: frameUrl, referer: page.url });
+        const frameUrl = safeImsUrl(src, initialPage.url).href;
+        if (!visited.has(frameUrl)) queued.push({ url: frameUrl, referer: initialPage.url });
       } catch {
         // Frames hosted outside IMS are unrelated to the authenticated portal flow.
       }
     });
+  } else {
+    queued.push({ url, referer });
+  }
+
+  while (queued.length && pages.length < maxPages) {
+    // Concurrently fetch queued frames in batches to avoid slow serial round-trips
+    const batch = queued.splice(0, Math.min(4, maxPages - pages.length));
+    const results = await Promise.allSettled(
+      batch.map(item => requestIms(session, item.url, { referer: item.referer }))
+    );
+
+    for (const result of results) {
+      if (result.status !== 'fulfilled') continue;
+      const page = result.value;
+      if (visited.has(page.url)) continue;
+      visited.add(page.url);
+      pages.push({ url: page.url, html: page.html });
+      const $ = load(page.html);
+      $('frame[src], iframe[src]').each((_, element) => {
+        const src = $(element).attr('src');
+        if (!src || /^javascript:/i.test(src)) return;
+        try {
+          const frameUrl = safeImsUrl(src, page.url).href;
+          if (!visited.has(frameUrl) && !queued.some(q => q.url === frameUrl)) {
+            queued.push({ url: frameUrl, referer: page.url });
+          }
+        } catch {
+          // Frames hosted outside IMS are unrelated to the authenticated portal flow.
+        }
+      });
+    }
   }
   return pages;
 }
