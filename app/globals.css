@@ -928,3 +928,80 @@ body{
   .myProfileDetailRow dt{color:#555!important}
   .myProfileDetailRow dd{color:#111!important}
 }
+
+/* ==========================================================================
+   Dashboard End-Sem Exam Schedule & Print Styles
+   ========================================================================== */
+
+.examScheduleSection{margin-bottom:30px}
+.examScheduleCard{background:#11151b;border:1px solid #1f2732;border-radius:12px;padding:22px;min-width:0}
+.examScheduleActions{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.examScheduleNoticeTag{font-size:11px;padding:3px 8px;border:1px solid #232d3a;background:#141b24;border-radius:5px;color:#8fa0b0}
+.examPrintButton{background:transparent;border:0;cursor:pointer;display:inline-flex;align-items:center;gap:6px;color:var(--green);font:500 12px 'Sora',sans-serif;padding:3px 6px;border-radius:4px;transition:color .15s}
+.examPrintButton:hover{text-decoration:underline;color:#7ee7b1}
+
+.examPrintLetterhead{display:none}
+
+.examNextSpotlight{background:#0d1812;border:1px solid #1c3b29;border-radius:10px;padding:16px 20px;margin:18px 0 16px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.examNextBadge{display:inline-block;font:600 10.5px 'Sora',sans-serif;letter-spacing:.08em;text-transform:uppercase;color:var(--green);margin-bottom:4px}
+.examNextSpotlightContent h3{font:600 16px 'Sora',sans-serif;color:#fff;margin:0 0 6px}
+.examNextDetails{display:flex;align-items:center;gap:12px;font-size:12px;color:#9bb0a3;flex-wrap:wrap}
+.examNextCode{font:700 11px 'Sora',sans-serif;color:#baf4d2;background:#152d20;padding:2px 7px;border-radius:4px;border:1px solid #204732}
+.examNextShift{display:inline-flex;align-items:center;gap:5px}
+
+.studentExamList{border-top:1px solid #1a222c;margin-top:12px}
+.studentExamRow{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:13px 0;border-bottom:1px solid #161d26}
+.studentExamRow.isNextExam{background:#0e1713;margin:0 -12px;padding:13px 12px;border-radius:8px;border-left:3px solid var(--green)}
+.studentExamDate{width:52px;text-align:center;flex-shrink:0;background:#141b24;border:1px solid #232d3a;border-radius:8px;padding:6px 2px}
+.studentExamDate b{display:block;font:700 16px 'Sora',sans-serif;color:#e4e9f0;line-height:1}
+.studentExamDate span{display:block;font:600 10px 'Sora',sans-serif;color:#7f8e9e;text-transform:uppercase;margin-top:2px}
+.studentExamDate small{display:block;font-size:9px;color:#5f6d7c;margin-top:1px}
+.studentExamBody{flex:1;min-width:0}
+.studentExamTitleRow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px}
+.studentExamTitleRow h4{font:600 13.5px 'Sora',sans-serif;margin:0;color:#e4e9f0}
+.studentExamSubRow{font-size:11.5px;color:#7f8d9b;display:flex;align-items:center;gap:12px}
+.studentExamShift{display:inline-flex;align-items:center;gap:5px}
+.studentExamStatus{flex-shrink:0;text-align:right}
+
+.examCountdownBadge{display:inline-block;padding:4px 9px;border-radius:6px;font:600 11.5px 'Sora',sans-serif;white-space:nowrap}
+.examCountdownBadge.upcoming{background:#10241a;color:var(--green);border:1px solid #1e3d2c}
+.examCountdownBadge.today{background:#2f1d10;color:#ff9d6d;border:1px solid #57331b;font-weight:700}
+.examCountdownBadge.passed{background:#161c24;color:#6f7d8c;border:1px solid #222c38}
+
+.examScheduleFooter{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:11px;color:#6d7b88;margin-top:16px;padding-top:12px;border-top:1px solid #1a222c;flex-wrap:wrap}
+.examDiscrepancy a{color:#8fa0b0;text-decoration:underline}
+
+.examScheduleUnsigned{display:flex;align-items:center;gap:18px;padding:24px 0 8px;flex-wrap:wrap}
+.examScheduleUnsignedIcon{color:var(--green);flex-shrink:0}
+.examScheduleUnsignedText{flex:1;min-width:240px}
+.examScheduleUnsignedText h3{font:600 15px 'Sora',sans-serif;margin:0 0 4px;color:#e4e9f0}
+.examScheduleUnsignedText p{font-size:12px;color:#7e8c9a;margin:0;line-height:1.5}
+
+@media print{
+  .hubSidebar,.hubTopbar,.mobileBottomNav,.imsSessionButton,.imsLoggedInBanner,.imsGateBackdrop,.pwaInstallButton,.hubHero,.summaryCards,.duoGrid,.hangouts,.examScheduleActions,.examNextCountdown,.examNextBadge,.studentExamStatus{display:none!important}
+  .examScheduleSection{margin:0!important;padding:0!important}
+  .examScheduleCard{background:#fff!important;border:none!important;box-shadow:none!important;padding:0!important}
+  .examPrintLetterhead{display:block!important;text-align:center;margin:0 0 6mm;padding-bottom:5mm;border-bottom:2px solid #111}
+  .examPrintLetterhead b{display:block;font:700 15pt 'Sora',sans-serif;color:#111}
+  .examPrintLetterhead span{display:block;font-size:9.5pt;color:#333;margin-top:1.5mm}
+  .examPrintLetterhead small{display:inline-block;font-size:8.5pt;font-weight:700;color:#111;text-transform:uppercase;letter-spacing:.08em;margin-top:2.5mm}
+  .examPrintLetterhead h3{font:700 12pt 'Sora',sans-serif;color:#111;margin:4mm 0 2mm}
+  .examPrintStudentMeta{display:flex;justify-content:center;gap:16px;flex-wrap:wrap;font-size:9pt;color:#333;margin-top:2mm}
+  .examPrintStudentMeta b{color:#111}
+  .examCardHead{display:none!important}
+  .examNextSpotlight{background:#f8f9fa!important;border:1px solid #ccc!important;margin:4mm 0!important;padding:3mm 5mm!important}
+  .examNextSpotlight *{color:#111!important}
+  .studentExamList{border-top:1px solid #111!important;margin-top:3mm!important}
+  .studentExamRow{border-bottom:1px solid #ddd!important;padding:3mm 0!important;background:#fff!important}
+  .studentExamRow *{color:#111!important}
+  .studentExamDate{background:#f2f4f7!important;border:1px solid #ccc!important}
+  .attCode{background:#f0f0f0!important;border:1px solid #ccc!important;color:#111!important}
+  .examScheduleFooter{border-top:1px solid #111!important;margin-top:4mm!important;padding-top:2mm!important;color:#444!important}
+  .examScheduleFooter *{color:#444!important}
+}
+
+@media(max-width:640px){
+  .studentExamRow{flex-direction:column;align-items:flex-start;gap:10px}
+  .studentExamStatus{align-self:flex-end}
+  .examNextSpotlight{flex-direction:column;align-items:flex-start}
+}

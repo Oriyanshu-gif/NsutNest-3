@@ -8,7 +8,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Activity, Bell, BookOpen, Briefcase, Home, Trophy, Users, type LucideIcon, LockKeyhole, RefreshCw, Eye, EyeOff, Loader2, LogOut } from "lucide-react";
+import { Activity, Bell, BookOpen, Briefcase, CalendarDays, Home, Trophy, Users, type LucideIcon, LockKeyhole, RefreshCw, Eye, EyeOff, Loader2, LogOut } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import type { ReactNode } from "react";
 import BrandLogo from "./brand-logo";
@@ -414,8 +414,8 @@ export function ImsLoginGate() {
       : "Sign in with your NSUT IMS account.";
 
   return <>
-    {attendance && !open && <button className="imsSessionButton" type="button" onClick={() => setOpen(true)}><Activity size={15} /> {attendance.roll || "IMS connected"}</button>}
-    {attendance && open && <div className="imsLoggedInBanner"><span><b>{attendance.name || attendance.roll}</b> · attendance saved on this device{attendance.syncedAt ? ` · synced ${new Date(attendance.syncedAt).toLocaleString()}` : ""}</span><button type="button" onClick={() => startResync()}><RefreshCw size={14}/> Sync again</button><button type="button" onClick={() => setOpen(false)}>Continue to dashboard</button><button type="button" onClick={logout} aria-label="Log out of IMS"><LogOut size={15}/></button></div>}
+    {attendance && !open && <button className="imsSessionButton" type="button" onClick={() => setOpen(true)} suppressHydrationWarning><Activity size={15} /> {attendance.roll || "IMS connected"}</button>}
+    {attendance && open && <div className="imsLoggedInBanner" suppressHydrationWarning><span><b>{attendance.name || attendance.roll}</b> · attendance saved on this device{attendance.syncedAt ? ` · synced ${new Date(attendance.syncedAt).toLocaleString()}` : ""}</span><button type="button" onClick={() => startResync()}><RefreshCw size={14}/> Sync again</button><button type="button" onClick={() => setOpen(false)}>Continue to dashboard</button><button type="button" onClick={logout} aria-label="Log out of IMS"><LogOut size={15}/></button></div>}
     {((open && !attendance) || syncing) && <div className="imsGateBackdrop" role="dialog" aria-modal="true" aria-labelledby="imsGateTitle">
       <form className="imsGateCard" onSubmit={submit}>
         <div className="imsGateMark"><LockKeyhole size={23}/></div>
@@ -611,14 +611,14 @@ export default function HubShell({ children }: { children: ReactNode }) {
           ))}
         </nav>
 
-        <div className="hubSidebarFooter">
+        <div className="hubSidebarFooter" suppressHydrationWarning>
           <Link href="/profile" className="hubUser hubUserLink" title={`Open ${studentName}'s My Profile`}>
-            <span className="hubUserAvatar">
+            <span className="hubUserAvatar" suppressHydrationWarning>
               {profile?.photo
                 ? <img src={profile.photo} alt="" />
                 : studentInitials}
             </span>
-            <span className="hubUserIdentity">
+            <span className="hubUserIdentity" suppressHydrationWarning>
               <b title={studentName}>{studentName}</b>
               <small>{loggedInStudent ? `Roll ${loggedInStudent.roll}` : "Not signed in to IMS"}</small>
             </span>
@@ -636,22 +636,22 @@ export default function HubShell({ children }: { children: ReactNode }) {
         ))}
       </nav>
       <div className="hubMain">
-        <header className="hubTopbar">
+        <header className="hubTopbar" suppressHydrationWarning>
           <div className="hubBreadcrumb">
             <span>NSUT</span>
             <span className="crumbSlash">/</span>
             <b>{activeLabel}</b>
           </div>
-          <div className="hubTopbarRight">
+          <div className="hubTopbarRight" suppressHydrationWarning>
             <LiveViewCount />
             {/* The sidebar is hidden on phones, so the profile stays reachable here. */}
-            <Link href="/profile" className="hubTopbarProfile" aria-label="Open My Profile">
+            <Link href="/profile" className="hubTopbarProfile" aria-label="Open My Profile" suppressHydrationWarning>
               {profile?.photo ? <img src={profile.photo} alt="" /> : <span>{studentInitials}</span>}
             </Link>
             <Link href="/notices" className="hubBell" aria-label="Open IMS notices">
               <Bell size={17} />
             </Link>
-            <span className={`hubSemester ${loggedInStudent ? "connected" : "idle"}`}>
+            <span className={`hubSemester ${loggedInStudent ? "connected" : "idle"}`} suppressHydrationWarning>
               <i className="hubSemesterDot" /> {loggedInStudent ? "IMS synced" : "IMS not connected"}
             </span>
           </div>

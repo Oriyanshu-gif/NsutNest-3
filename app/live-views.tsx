@@ -145,9 +145,9 @@ export function LiveViewCount() {
   if (count === null) return null;
 
   return (
-    <span className="liveViews" title="Total website visits (one per browsing session)">
+    <span className="liveViews" title="Total website visits (one per browsing session)" suppressHydrationWarning>
       <Users size={15} />
-      <b>{count.toLocaleString("en-IN")}</b>
+      <b suppressHydrationWarning>{count.toLocaleString("en-IN")}</b>
       <span>total visits</span>
     </span>
   );

@@ -19,13 +19,21 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
-  Activity, AlertTriangle, ArrowLeft, ArrowRight, ArrowUpRight, BellRing, ChevronRight, Coffee, GraduationCap,
-  Landmark, Loader2, MapPin, RefreshCw, Star, TrendingUp, Users, X,
+  Activity, AlertTriangle, ArrowLeft, ArrowRight, ArrowUpRight, BellRing, CalendarDays, ChevronRight, Clock, Coffee, GraduationCap,
+  Landmark, Loader2, MapPin, Printer, RefreshCw, Star, TrendingUp, Users, X,
 } from "lucide-react";
 import { loadStudents, type Student } from "../lib/data";
 import { withResolvedSubjectNames } from "../lib/attendance";
 import { ATTENDANCE_SYNC_EVENT, ATTENDANCE_REFRESH_STATUS_EVENT, PROFILE_SYNC_EVENT, readStoredAttendance, readStoredProfile, requestAttendanceRefresh } from "../lib/app-storage";
 import { isRecentNotice } from "../lib/notice-date";
+import {
+  formatExamDate,
+  getExamCountdown,
+  loadDatesheet,
+  matchStudentExams,
+  type DatesheetPayload,
+  type ExamScheduleItem,
+} from "../lib/datesheet";
 import HubShell from "./hub-shell";
 import { SubjectAttendanceCalendar } from "./attendance-calendar";
 import { useLiveViewCount } from "./live-views";
@@ -143,6 +151,19 @@ function OverviewBody() {
   const [campusMapOpen, setCampusMapOpen] = useState(false);
   const [greetingText, setGreetingText] = useState("Welcome");
   const [dateLine, setDateLine] = useState("");
+  const [datesheet, setDatesheet] = useState<DatesheetPayload | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    loadDatesheet()
+      .then((payload) => {
+        if (active) setDatesheet(payload);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     const now = new Date();
@@ -251,6 +272,24 @@ function OverviewBody() {
     return notices.filter((n) => n.isoDate >= week).length;
   }, [notices]);
 
+  const studentExams = useMemo(() => {
+    if (!datesheet || !liveAttendance?.subjects?.length) return [];
+    const codes = liveAttendance.subjects.map((s) => s.code);
+    const sem = liveAttendance.selectedSemester || liveAttendance.semester;
+    return matchStudentExams(codes, datesheet, sem);
+  }, [datesheet, liveAttendance]);
+
+  const nextExam = useMemo(() => {
+    if (!studentExams.length) return null;
+    const now = new Date();
+    return (
+      studentExams.find((exam) => {
+        const { status } = getExamCountdown(exam.isoDate, now);
+        return status === "today" || status === "upcoming";
+      }) ?? studentExams[0]
+    );
+  }, [studentExams]);
+
   if (error) {
     return (
       <div className="empty"><AlertTriangle size={30} /><h3>Could not load the dashboard</h3><p>{error}</p></div>
@@ -270,48 +309,175 @@ function OverviewBody() {
   return (
     <>
       {/* ---- Section 1: greeting + identity + summary cards ---- */}
-      <section className="hubHero">
-        <div className="hubHeroText">
-          {dateLine && <div className="hubDateLine">{dateLine}</div>}
-          <h1>
+      <section className="hubHero" suppressHydrationWarning>
+        <div className="hubHeroText" suppressHydrationWarning>
+          {dateLine && <div className="hubDateLine" suppressHydrationWarning>{dateLine}</div>}
+          <h1 suppressHydrationWarning>
             {greetingText}{firstName ? `, ${firstName}` : ""}
           </h1>
           <p>Academic records, live IMS attendance and official notifications.</p>
         </div>
-        <div className="rollCard">
+        <div className="rollCard" suppressHydrationWarning>
           <small>Student Roll</small>
-          <b>{liveAttendance ? liveAttendance.roll || "IMS connected" : "IMS not connected"}</b>
+          <b suppressHydrationWarning>{liveAttendance ? liveAttendance.roll || "IMS connected" : "IMS not connected"}</b>
           {liveAttendance && <span className="rollMeta" suppressHydrationWarning>{attendanceFresh ? "Live IMS" : "Saved attendance"} · synced {new Date(liveAttendance.syncedAt).toLocaleString()}</span>}
         </div>
       </section>
 
-      <section className="summaryCards">
-        <div className="summaryCard attCard">
+      <section className="summaryCards" suppressHydrationWarning>
+        <div className="summaryCard attCard" suppressHydrationWarning>
           <Activity className="scIcon att" size={20} />
           <small>Overall attendance</small>
-          <b>{subjectRows.length ? `${overall.toFixed(1)}%` : "—"}</b>
-          <span className="scFoot">{liveAttendance ? (attendanceFresh ? "Fetched from NSUT IMS" : "Saved from NSUT IMS") : "Connect to IMS first"}</span>
+          <b suppressHydrationWarning>{subjectRows.length ? `${overall.toFixed(1)}%` : "—"}</b>
+          <span className="scFoot" suppressHydrationWarning>{liveAttendance ? (attendanceFresh ? "Fetched from NSUT IMS" : "Saved from NSUT IMS") : "Connect to IMS first"}</span>
         </div>
-        <a className="summaryCard sgpaCard" href={me ? `/student/${encodeURIComponent(me.roll)}` : "/results"}>
+        <a className="summaryCard sgpaCard" href={me ? `/student/${encodeURIComponent(me.roll)}` : "/results"} suppressHydrationWarning>
           <GraduationCap className="scIcon sgpa" size={20} />
           <small>Latest SGPA</small>
-          <b>{latestSgpa !== null ? latestSgpa.toFixed(2) : "—"}</b>
-          <span className="scFoot">
+          <b suppressHydrationWarning>{latestSgpa !== null ? latestSgpa.toFixed(2) : "—"}</b>
+          <span className="scFoot" suppressHydrationWarning>
             {me ? `Sem ${me.semester} · ${me.ay}-${String(me.ay + 1).slice(-2)} · ` : ""}
             Result details <ArrowUpRight size={12} />
           </span>
         </a>
-        <a className="summaryCard notCard" href="/notices">
+        <a className="summaryCard notCard" href="/notices" suppressHydrationWarning>
           <span className="scIcon not"><BellRing size={18} /></span>
           <small>New notices</small>
-          <b>{notices ? String(notices.length).padStart(2, "0") : "—"}</b>
-          <span className="scFoot">{newThisWeek} posted this week <ArrowUpRight size={12} /></span>
+          <b suppressHydrationWarning>{notices ? String(notices.length).padStart(2, "0") : "—"}</b>
+          <span className="scFoot" suppressHydrationWarning>{newThisWeek} posted this week <ArrowUpRight size={12} /></span>
         </a>
-        <div className="summaryCard pulseCard">
+        <div className="summaryCard pulseCard" suppressHydrationWarning>
           <Users className="scIcon pulse" size={20} />
           <small>Site visits</small>
-          <b>{visits !== null ? visits.toLocaleString("en-IN") : "—"}</b>
+          <b suppressHydrationWarning>{visits !== null ? visits.toLocaleString("en-IN") : "—"}</b>
           <span className="scFoot">browsing sessions so far</span>
+        </div>
+      </section>
+
+      {/* ---- Section: Personalized End-Sem Date Sheet ---- */}
+      <section className="examScheduleSection" suppressHydrationWarning>
+        <div className="hubCard examScheduleCard" suppressHydrationWarning>
+          {/* Printable Letterhead (visible only on print) */}
+          <div className="examPrintLetterhead" suppressHydrationWarning>
+            <b>NETAJI SUBHAS UNIVERSITY OF TECHNOLOGY</b>
+            <span>Azad Hind Fauj Marg, Sector-3, Dwarka, New Delhi - 110078</span>
+            <small>OFFICE OF THE CONTROLLER OF EXAMINATION</small>
+            <h3>End-Semester Examination Date Sheet (Odd Semester 2026-27)</h3>
+            <div className="examPrintStudentMeta" suppressHydrationWarning>
+              <span><b>Student:</b> {rawName || "Student"}</span>
+              <span><b>Roll No:</b> {liveAttendance?.roll || "—"}</span>
+              <span><b>Semester:</b> {liveAttendance?.selectedSemester || liveAttendance?.semester || "—"}</span>
+              <span><b>Notice Ref:</b> {"F. No. 220(298)/Mid & End 2026-27/2026/Exam/NSUT/1002"}</span>
+            </div>
+          </div>
+
+          <div className="hubCardHead examCardHead" suppressHydrationWarning>
+            <div>
+              <small className="panelKicker">End-Sem Date Sheet · Odd Semester 2026-27</small>
+              <h2 suppressHydrationWarning>{liveAttendance ? "Your exam schedule" : "End-sem exam schedule"}</h2>
+            </div>
+            <div className="examScheduleActions" suppressHydrationWarning>
+              <span className="examScheduleNoticeTag">Tentative · COE 06/11/2026</span>
+              {liveAttendance && studentExams.length > 0 && (
+                <button
+                  type="button"
+                  className="panelLink examPrintButton"
+                  onClick={() => window.print()}
+                  title="Print your end-sem exam schedule"
+                >
+                  <Printer size={13} /> Print date sheet
+                </button>
+              )}
+            </div>
+          </div>
+
+          {!liveAttendance ? (
+            <div className="examScheduleUnsigned" suppressHydrationWarning>
+              <CalendarDays size={26} className="examScheduleUnsignedIcon" />
+              <div className="examScheduleUnsignedText">
+                <h3>Personalized exam dates for your subjects</h3>
+                <p>
+                  Sign in to NSUT IMS above to automatically match your registered subjects with the official end-sem date sheet and view your exam schedule.
+                </p>
+              </div>
+            </div>
+          ) : studentExams.length === 0 ? (
+            <div className="examScheduleUnsigned" suppressHydrationWarning>
+              <CalendarDays size={26} className="examScheduleUnsignedIcon" />
+              <div className="examScheduleUnsignedText">
+                <h3>No written exams scheduled in tentative date sheet</h3>
+                <p>
+                  Your current registered subjects ({liveAttendance.subjects.map((s) => s.code).join(", ")}) may be practical or continuous evaluation courses.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <>
+              {nextExam && (
+                <div className="examNextSpotlight" suppressHydrationWarning>
+                  <div className="examNextSpotlightContent">
+                    <span className="examNextBadge">Next upcoming exam</span>
+                    <h3>{nextExam.name}</h3>
+                    <div className="examNextDetails">
+                      <span className="examNextCode">{nextExam.code}</span>
+                      <span>
+                        {formatExamDate(nextExam.isoDate).dayOfWeek}, {formatExamDate(nextExam.isoDate).formattedDate}
+                      </span>
+                      <span className="examNextShift">
+                        <Clock size={12} /> {nextExam.shift} ({nextExam.time})
+                      </span>
+                    </div>
+                  </div>
+                  <div className="examNextCountdown">
+                    <span className={`examCountdownBadge ${getExamCountdown(nextExam.isoDate).status}`} suppressHydrationWarning>
+                      {getExamCountdown(nextExam.isoDate).label}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              <div className="studentExamList" suppressHydrationWarning>
+                {studentExams.map((exam) => {
+                  const countdown = getExamCountdown(exam.isoDate);
+                  const { dayOfWeek, formattedDate } = formatExamDate(exam.isoDate);
+                  const isNext = nextExam?.code === exam.code;
+
+                  return (
+                    <div key={exam.code} className={`studentExamRow ${isNext ? "isNextExam" : ""}`} suppressHydrationWarning>
+                      <div className="studentExamDate">
+                        <b>{formattedDate.split(" ")[0]}</b>
+                        <span>{formattedDate.split(" ")[1]}</span>
+                        <small>{dayOfWeek.slice(0, 3)}</small>
+                      </div>
+                      <div className="studentExamBody">
+                        <div className="studentExamTitleRow">
+                          <h4>{exam.name}</h4>
+                          <span className="attCode">{exam.code}</span>
+                        </div>
+                        <div className="studentExamSubRow">
+                          <span className="studentExamShift">
+                            <Clock size={12} /> {exam.shift} · {exam.time}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="studentExamStatus">
+                        <span className={`examCountdownBadge ${countdown.status}`} suppressHydrationWarning>
+                          {countdown.label}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="examScheduleFooter">
+                <span>Shift 1: 10:00 AM – 01:00 PM · Shift 2: 02:00 PM – 05:00 PM</span>
+                <span className="examDiscrepancy">
+                  Clashes / Discrepancies: <a href="mailto:examination@nsut.ac.in">examination@nsut.ac.in</a>
+                </span>
+              </div>
+            </>
+          )}
         </div>
       </section>
 
