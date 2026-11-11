@@ -1430,3 +1430,10 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 @media(max-width:640px){html{font-size:100%}body{overscroll-behavior-y:contain}}
 
 @media(max-width:640px){.mobileBottomNavItem span{white-space:normal;overflow:visible;text-overflow:clip;line-height:1.05;text-align:center}}
+
+/* Simplified notices: latest items, PDFs open directly. */
+.ntToolbar{padding:0;border:0;background:transparent;gap:0}
+.ntRowMain{padding:12px 14px}
+.ntFootNote{flex-wrap:wrap}
+.ntFootNote a{display:inline-flex;align-items:center;gap:4px;color:#8fd6b1;text-decoration:none;font-weight:600}
+.ntFootNote a:hover{text-decoration:underline}

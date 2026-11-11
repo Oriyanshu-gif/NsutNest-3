@@ -22,6 +22,7 @@ import {
   CalendarDays,
   ChevronRight,
   Clock,
+  ExternalLink,
   GraduationCap,
   Loader2,
   MapPin,
@@ -42,11 +43,7 @@ import {
   readStoredProfile,
   requestAttendanceRefresh,
 } from "../lib/app-storage";
-import { isRecentNotice } from "../lib/notice-date";
 import {
-  countUnread,
-  markNoticeRead,
-  noticeId,
   refreshNotices,
   relativeNoticeDate,
   useNoticeStore,
@@ -66,7 +63,6 @@ import {
   OfflineBanner,
   Skeleton,
   StatusChip,
-  UnreadBadge,
   useOnlineStatus,
 } from "./ui";
 
@@ -358,7 +354,6 @@ function OverviewBody() {
 
   const notices = noticeStore.payload?.notices ?? [];
   const noticesPreview = notices.slice(0, 4);
-  const unreadNotices = countUnread(notices, noticeStore.readIds);
   const newThisWeek = useMemo(() => {
     const week = new Date(Date.now() - 7 * 86_400_000).toISOString().slice(0, 10);
     return notices.filter((notice) => notice.isoDate >= week).length;
@@ -463,33 +458,25 @@ function OverviewBody() {
     }
     return (
       <div className="hubNoticeList">
-        {noticesPreview.map((notice) => {
-          const id = noticeId(notice);
-          const unread = !noticeStore.readIds.includes(id);
-          return (
-            <Link
-              className="hubNoticeRow"
-              key={id}
-              href={`/notices/${id}`}
-              onClick={() => markNoticeRead(id)}
-            >
-              <span className={`hubNoticeDot ${unread ? "on" : ""}`} aria-hidden="true" />
-              <span className="hubNoticeText">
-                <h4>
-                  {notice.title}
-                  {unread && isRecentNotice(notice.isoDate) && <span className="newBadge">New</span>}
-                </h4>
-                <p>
-                  {notice.department || "NSUT"} ·{" "}
-                  <time dateTime={notice.isoDate} title={notice.date}>
-                    {relativeNoticeDate(notice.isoDate)}
-                  </time>
-                </p>
-              </span>
-              <ChevronRight size={16} className="hubNoticeChev" aria-hidden="true" />
-            </Link>
-          );
-        })}
+        {noticesPreview.map((notice) => (
+          <a
+            className="hubNoticeRow"
+            key={`${notice.isoDate}-${notice.title}`}
+            href={notice.href}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label={`Open PDF: ${notice.title}`}
+          >
+            <span className="hubNoticeText">
+              <h4>{notice.title}</h4>
+              <p>
+                {notice.department || "NSUT"} ·{" "}
+                <time dateTime={notice.isoDate}>{relativeNoticeDate(notice.isoDate)}</time>
+              </p>
+            </span>
+            <ExternalLink size={16} className="hubNoticeChev" aria-hidden="true" />
+          </a>
+        ))}
       </div>
     );
   }
@@ -546,13 +533,12 @@ function OverviewBody() {
         </a>
         <Link className="summaryCard notCard" href="/notices">
           <span className="scIcon not"><BellRing size={18} aria-hidden="true" /></span>
-          <small>New notices</small>
-          <b>{noticeStore.payload ? String(unreadNotices).padStart(2, "0") : "—"}</b>
+          <small>Notices this week</small>
+          <b>{noticeStore.payload ? String(newThisWeek).padStart(2, "0") : "—"}</b>
           <span className="scFoot">
-            {noticeStore.payload ? `${newThisWeek} posted this week · ${notices.length} total` : "Loading notices"}
+            {noticeStore.payload ? "Latest from the IMS board" : "Loading notices"}
             <ArrowUpRight size={12} aria-hidden="true" />
           </span>
-          <UnreadBadge count={unreadNotices} className="scCardBadge" />
         </Link>
         <a className="summaryCard examCard" href="#exams">
           <CalendarDays className="scIcon exam" size={20} aria-hidden="true" />

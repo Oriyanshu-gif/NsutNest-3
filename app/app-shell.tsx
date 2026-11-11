@@ -32,8 +32,6 @@ import {
 } from "lucide-react";
 import BrandLogo from "./brand-logo";
 import { InstallBanner } from "./install-pwa";
-import { UnreadBadge } from "./ui";
-import { useUnreadNoticeCount } from "../lib/notices-client";
 import {
   ATTENDANCE_REFRESH_STATUS_EVENT,
   ATTENDANCE_SYNC_EVENT,
@@ -88,7 +86,6 @@ function readCollapsed(): boolean {
 export default function HubShell({ children }: { children: ReactNode }) {
   const pathname = usePathname() ?? "/";
   const activeLabel = crumb(pathname);
-  const unread = useUnreadNoticeCount();
   const [collapsed, setCollapsed] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [topbarHidden, setTopbarHidden] = useState(false);
@@ -347,7 +344,6 @@ export default function HubShell({ children }: { children: ReactNode }) {
             >
               <Icon size={19} aria-hidden="true" />
               <span className="hubNavText">{label}</span>
-              {href === "/notices" && <UnreadBadge count={unread} className="hubNavBadge" />}
             </Link>
           ))}
         </nav>
@@ -384,7 +380,6 @@ export default function HubShell({ children }: { children: ReactNode }) {
           >
             <span className="mobileTabIcon">
               <Icon size={21} strokeWidth={isActive(href) ? 2.4 : 1.8} aria-hidden="true" />
-              {href === "/notices" && <UnreadBadge count={unread} className="mobileTabBadge" />}
             </span>
             <span>{short}</span>
           </Link>
@@ -484,10 +479,9 @@ export default function HubShell({ children }: { children: ReactNode }) {
             <Link
               href="/notices"
               className="hubBell"
-              aria-label={unread ? `Notices, ${unread} unread` : "Notices"}
+              aria-label="Notices"
             >
               <Bell size={17} aria-hidden="true" />
-              <UnreadBadge count={unread} className="hubBellBadge" />
             </Link>
             <span className={`hubSemester ${loggedInStudent ? "connected" : "idle"}`}>
               <i className="hubSemesterDot" /> {loggedInStudent ? "IMS synced" : "IMS not connected"}
