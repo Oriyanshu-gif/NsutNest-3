@@ -65,7 +65,7 @@ function StudyMaterialBody() {
     : "";
 
   return (
-    <main className="studyShell">
+    <div className="studyShell">
       <header className="studyHeader">
         <div>
           <small className="panelKicker">Coursework &amp; subjects</small>
@@ -112,6 +112,6 @@ function StudyMaterialBody() {
           available here soon.
         </small>
       </footer>
-    </main>
+    </div>
   );
 }

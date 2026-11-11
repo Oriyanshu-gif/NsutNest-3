@@ -121,7 +121,7 @@ function ResultsBoard() {
   const resetFilters = () => { setQuery(""); setYear("All"); setSemester("All"); setBranches([]); };
 
   return (
-    <main className="rsShell">
+    <div className="rsShell">
       <header className="rsHead">
         <div>
           <small className="panelKicker">Gazette · B.Tech results</small>
@@ -272,6 +272,6 @@ function ResultsBoard() {
         <p>NsutNest · unofficial student project</p>
         <small>Compiled from the 2022–23 to 2025–26 semester gazettes and CGPA tables.</small>
       </footer>
-    </main>
+    </div>
   );
 }

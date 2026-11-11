@@ -1,44 +1,75 @@
 "use client";
 
 /**
- * NsutNest Dashboard — one continuous, vertically scrollable dashboard.
+ * NsutNest dashboard.
  *
- * Sections, in order (matching the three reference screenshots, which are three
- * scroll positions of this single page):
- *   1. Greeting + student identity card, four summary cards.
- *   2. Attendance snapshot (circular gauge + subject rows) beside Important notices.
- *   3. Popular hangouts + footer.
+ * Order: greeting + identity, a data-driven "needs attention" strip, four metric
+ * cards, the personalised exam date sheet, attendance beside notices, then campus spots.
  *
- * All figures come from the real dataset: the identity card and Latest SGPA come
- * from the gazette students.json, summary-card subject rows come from
- * subjects.json for the same student, and notices come from the live IMS board
- * through /api/notices. Only the campus hangouts and community stats are static
- * directory content — they describe the campus, not the student.
+ * Every figure is read from data already on this device (IMS attendance), the
+ * published results dataset, the COE date sheet, or the live notice board. There
+ * are no estimated percentages and no fabricated exam dates.
  */
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
-  Activity, AlertTriangle, ArrowLeft, ArrowRight, ArrowUpRight, BellRing, CalendarDays, ChevronRight, Clock, Coffee, GraduationCap,
-  Landmark, Loader2, MapPin, Printer, RefreshCw, Star, TrendingUp, Users, X,
+  Activity,
+  AlertTriangle,
+  ArrowDownUp,
+  ArrowUpRight,
+  BellRing,
+  CalendarDays,
+  ChevronRight,
+  Clock,
+  GraduationCap,
+  Loader2,
+  MapPin,
+  Minus,
+  Plus,
+  Printer,
+  RefreshCw,
+  TrendingUp,
+  X,
 } from "lucide-react";
 import { loadStudents, type Student } from "../lib/data";
 import { withResolvedSubjectNames } from "../lib/attendance";
-import { ATTENDANCE_SYNC_EVENT, ATTENDANCE_REFRESH_STATUS_EVENT, PROFILE_SYNC_EVENT, readStoredAttendance, readStoredProfile, requestAttendanceRefresh } from "../lib/app-storage";
+import {
+  ATTENDANCE_REFRESH_STATUS_EVENT,
+  ATTENDANCE_SYNC_EVENT,
+  PROFILE_SYNC_EVENT,
+  readStoredAttendance,
+  readStoredProfile,
+  requestAttendanceRefresh,
+} from "../lib/app-storage";
 import { isRecentNotice } from "../lib/notice-date";
+import {
+  countUnread,
+  markNoticeRead,
+  noticeId,
+  refreshNotices,
+  relativeNoticeDate,
+  useNoticeStore,
+} from "../lib/notices-client";
 import {
   formatExamDate,
   getExamCountdown,
   loadDatesheet,
   matchStudentExams,
   type DatesheetPayload,
-  type ExamScheduleItem,
 } from "../lib/datesheet";
-import HubShell from "./hub-shell";
+import HubShell from "./app-shell";
 import { SubjectAttendanceCalendar } from "./attendance-calendar";
-import { useLiveViewCount } from "./live-views";
+import {
+  AttendanceBar,
+  attendanceTone,
+  OfflineBanner,
+  Skeleton,
+  StatusChip,
+  UnreadBadge,
+  useOnlineStatus,
+} from "./ui";
 
-/** One subject row in the attendance snapshot. */
 type SubjectRow = {
   title: string;
   code: string;
@@ -46,8 +77,9 @@ type SubjectRow = {
   held: number;
   percent: number;
   canSkip: number;
-  mustAttend?: number;
+  mustAttend: number;
 };
+
 type LiveAttendancePayload = {
   name: string;
   roll: string;
@@ -61,14 +93,7 @@ type LiveAttendancePayload = {
   syncedAt: string;
 };
 
-const POLICY = 0.75;
-
-/** Classes this subject can still miss and stay at or above 75%. */
-function skipBudget(attended: number, held: number): number {
-  // Miss k more classes: (attended) / (held + k) >= 0.75  =>  k <= attended/0.75 - held.
-  return Math.max(0, Math.floor(attended / POLICY - held));
-}
-
+const POLICY = 75;
 
 const SHARED_HANGOUTS = [
   { name: "Grover Sweets", place: "Sweets & snacks", url: "https://share.google/QWKzCOF5mPXxIsLR8", img: "https://images.unsplash.com/photo-1601050690597-df0568f70950?auto=format&fit=crop&w=900&q=80", alt: "Indian sweets and snacks" },
@@ -76,49 +101,105 @@ const SHARED_HANGOUTS = [
   { name: "Mehfil Restaurant", place: "New Delhi · Restaurant", url: "https://share.google/qwWGaFPImDuVKFjgm", img: "/images/hangouts/mehfil-restaurant.png", alt: "Mehfil Restaurant signboard, photo supplied by the user" },
 ] as const;
 
-function greeting(date: Date): string {
-  const h = date.getHours();
-  if (h < 5) return "Up late";
-  if (h < 12) return "Good morning";
-  if (h < 17) return "Good afternoon";
-  return "Good evening";
-}
-
 const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
-/** Months the portal has date-wise records for, used by the calendar's month picker. */
-function subjectAttendanceMonths(daily: LiveAttendancePayload["daily"], code: string): string[] {
-  return Array.from(new Set((daily ?? [])
-    .filter(day => day.values[code] && /^\d{4}-\d{2}-\d{2}$/.test(day.date))
-    .map(day => day.date.slice(0, 7))))
-    .sort();
+function greeting(date: Date): string {
+  const hour = date.getHours();
+  if (hour < 5) return "Up late";
+  if (hour < 12) return "Good morning";
+  if (hour < 17) return "Good afternoon";
+  return "Good evening";
 }
 
-/* ---------- Circular attendance gauge (pure SVG, no dependency) ---------- */
+function subjectAttendanceMonths(daily: LiveAttendancePayload["daily"], code: string): string[] {
+  return Array.from(
+    new Set(
+      (daily ?? [])
+        .filter((day) => day.values[code] && /^\d{4}-\d{2}-\d{2}$/.test(day.date))
+        .map((day) => day.date.slice(0, 7)),
+    ),
+  ).sort();
+}
+
+/** Classes that can still be missed while staying at or above 75%. */
+function skipBudget(attended: number, held: number): number {
+  return held > 0 ? Math.max(0, Math.floor(attended / (POLICY / 100) - held)) : 0;
+}
+
+/** Consecutive classes needed to climb back to 75%. */
+function attendBudget(attended: number, held: number): number {
+  return held > 0 ? Math.max(0, Math.ceil((POLICY / 100) * held - attended) / (1 - POLICY / 100)) : 0;
+}
+
+function actionLine(row: SubjectRow, tone: ReturnType<typeof attendanceTone>): string {
+  if (tone === "none") return "No classes held yet";
+  if (row.percent < POLICY) return `Attend ${Math.ceil(attendBudget(row.attended, row.held))} consecutive classes to reach 75%`;
+  if (tone === "borderline") return `Can miss ${skipBudget(row.attended, row.held)} more classes — right at the 75% line`;
+  return `Can miss ${skipBudget(row.attended, row.held)} more classes and stay at 75%`;
+}
+
+/* ---------- Circular gauge with a visible 75% marker ---------- */
 function Gauge({ percent }: { percent: number }) {
   const clamped = Math.max(0, Math.min(100, percent));
-  const R = 52;
-  const C = 2 * Math.PI * R;
-  const dash = (clamped / 100) * C;
-  const good = clamped >= POLICY * 100;
+  const radius = 52;
+  const circumference = 2 * Math.PI * radius;
+  const dash = (clamped / 100) * circumference;
+  const good = clamped >= POLICY;
+
   return (
     <div className="gauge">
-      <svg viewBox="0 0 120 120" width="128" height="128" role="img" aria-label={`Overall attendance ${clamped.toFixed(1)}%`}>
-        <circle cx="60" cy="60" r={R} fill="none" stroke="#262a2e" strokeWidth="11" />
+      <svg viewBox="0 0 120 120" width="132" height="132" role="img" aria-label={`Overall attendance ${clamped.toFixed(1)} percent, 75 percent minimum`}>
+        <circle cx="60" cy="60" r={radius} fill="none" className="gaugeTrack" strokeWidth="11" />
         <circle
-          cx="60" cy="60" r={R} fill="none"
-          stroke={good ? "var(--green)" : "#ff9d6d"}
-          strokeWidth="11" strokeLinecap="round"
-          strokeDasharray={`${dash} ${C - dash}`}
+          cx="60"
+          cy="60"
+          r={radius}
+          fill="none"
+          className={`gaugeArcLine ${good ? "good" : "low"}`}
+          strokeWidth="11"
+          strokeLinecap="round"
+          strokeDasharray={`${dash} ${circumference - dash}`}
           transform="rotate(-90 60 60)"
-          className="gaugeArc"
         />
+        {/* 75% sits exactly at the left of the ring. */}
+        <line x1="3" y1="60" x2="15" y2="60" className="gaugeTick" strokeWidth="3" strokeLinecap="round" />
       </svg>
       <div className="gaugeCenter">
         <b>{clamped.toFixed(1)}%</b>
         <small>overall</small>
       </div>
+    </div>
+  );
+}
+
+function SkipEstimator({ subject }: { subject: SubjectRow }) {
+  const [skip, setSkip] = useState(0);
+  const projected = subject.held + skip > 0 ? (subject.attended / (subject.held + skip)) * 100 : 0;
+  const below = projected < POLICY;
+
+  return (
+    <div className="skipEstimator">
+      <div className="skipHead">
+        <span className="skipTitle">What if I skip?</span>
+        <span className="skipTag">Estimate</span>
+      </div>
+      <div className="skipBody">
+        <div className="skipStepper" role="group" aria-label="Number of classes to skip">
+          <button type="button" onClick={() => setSkip((value) => Math.max(0, value - 1))} disabled={skip === 0} aria-label="Skip one fewer class">
+            <Minus size={15} aria-hidden="true" />
+          </button>
+          <span className="skipValue"><b>{skip}</b> class{skip === 1 ? "" : "es"}</span>
+          <button type="button" onClick={() => setSkip((value) => Math.min(20, value + 1))} disabled={skip >= 20} aria-label="Skip one more class">
+            <Plus size={15} aria-hidden="true" />
+          </button>
+        </div>
+        <p className="skipResult">
+          Attendance becomes <b className={below ? "low" : ""}>{projected.toFixed(1)}%</b>
+          {below ? " — below the 75% minimum." : "."}
+        </p>
+      </div>
+      <small className="skipNote">Estimate only: assumes those classes are held and you attend none of them.</small>
     </div>
   );
 }
@@ -132,26 +213,29 @@ export default function Overview() {
 }
 
 function OverviewBody() {
+  const noticeStore = useNoticeStore();
+  const online = useOnlineStatus();
   const [students, setStudents] = useState<Student[] | null>(null);
-  const [marksByRoll, setMarksByRoll] = useState<Record<string, Record<string, { subjects: { code: string }[] }>> | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [notices, setNotices] = useState<Payload["notices"] | null>(null);
-  const [noticesError, setNoticesError] = useState<string | null>(null);
   const [liveAttendance, setLiveAttendance] = useState<LiveAttendancePayload | null>(null);
+  const [attendanceReady, setAttendanceReady] = useState(false);
   const [profileName, setProfileName] = useState("");
   const [attendanceRefreshing, setAttendanceRefreshing] = useState(false);
+  const [retryingNotices, setRetryingNotices] = useState(false);
+  const [selectedAttendanceSubject, setSelectedAttendanceSubject] = useState<string | null>(null);
+  const [attendanceCalendarMonth, setAttendanceCalendarMonth] = useState("");
+  const [sortByRisk, setSortByRisk] = useState(true);
+  const [showSafe, setShowSafe] = useState(false);
+  const [campusMapOpen, setCampusMapOpen] = useState(false);
+  const [greetingText, setGreetingText] = useState("Welcome");
+  const [dateLine, setDateLine] = useState("");
+  const [datesheet, setDatesheet] = useState<DatesheetPayload | null>(null);
 
   useEffect(() => {
     const onStatus = (event: Event) => setAttendanceRefreshing((event as CustomEvent<boolean>).detail);
     window.addEventListener(ATTENDANCE_REFRESH_STATUS_EVENT, onStatus);
     return () => window.removeEventListener(ATTENDANCE_REFRESH_STATUS_EVENT, onStatus);
   }, []);
-  const [selectedAttendanceSubject, setSelectedAttendanceSubject] = useState<string | null>(null);
-  const [attendanceCalendarMonth, setAttendanceCalendarMonth] = useState("");
-  const [campusMapOpen, setCampusMapOpen] = useState(false);
-  const [greetingText, setGreetingText] = useState("Welcome");
-  const [dateLine, setDateLine] = useState("");
-  const [datesheet, setDatesheet] = useState<DatesheetPayload | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -159,7 +243,9 @@ function OverviewBody() {
       .then((payload) => {
         if (active) setDatesheet(payload);
       })
-      .catch(() => {});
+      .catch(() => {
+        // The schedule simply stays unset; attendance and notices still render.
+      });
     return () => {
       active = false;
     };
@@ -171,29 +257,27 @@ function OverviewBody() {
     setDateLine(`${WEEKDAYS[now.getDay()]}, ${now.getDate()} ${MONTHS[now.getMonth()]} ${now.getFullYear()}`);
   }, []);
 
-  /** Total browsing-session visits, straight from Redis. */
-  const visits = useLiveViewCount();
-
   useEffect(() => {
     const sync = () => {
       try {
-        // IMS sometimes returns no name with attendance; the profile does.
         const profile = readStoredProfile();
         if (profile) {
           const parsedProfile = JSON.parse(profile) as { name?: string };
           setProfileName(parsedProfile.name?.trim() ?? "");
         }
         const cached = readStoredAttendance();
-        const parsed = cached ? JSON.parse(cached) as LiveAttendancePayload : null;
+        const parsed = cached ? (JSON.parse(cached) as LiveAttendancePayload) : null;
         if (!parsed?.roll?.trim()) {
           setLiveAttendance(null);
+          setAttendanceReady(true);
           return;
         }
-        setLiveAttendance({
-          ...parsed,
-          subjects: withResolvedSubjectNames(parsed.subjects),
-        });
-      } catch { setLiveAttendance(null); }
+        setLiveAttendance({ ...parsed, subjects: withResolvedSubjectNames(parsed.subjects) });
+      } catch {
+        setLiveAttendance(null);
+      } finally {
+        setAttendanceReady(true);
+      }
     };
     sync();
     window.addEventListener(ATTENDANCE_SYNC_EVENT, sync);
@@ -208,175 +292,311 @@ function OverviewBody() {
     let active = true;
     loadStudents().then(
       (rows) => active && setStudents(rows),
-      (err) => active && setError(err instanceof Error ? err.message : "Could not load results data."),
+      (failure) => active && setError(failure instanceof Error ? failure.message : "Could not load results data."),
     );
-    fetch("/data/subjects.json")
-      .then((res) => res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`)))
-      .then((payload) => {
-        if (!active) return;
-        // subjects.json stores each semester as a tuple:
-        // semesters[roll][semester] = [credits, creditPoints, [code, grade, cp][], ay]
-        const byRoll: Record<string, Record<string, { subjects: { code: string }[] }>> = {};
-        for (const [roll, sems] of Object.entries(payload.semesters ?? {})) {
-          const map: Record<string, { subjects: { code: string }[] }> = {};
-          for (const [sem, entry] of Object.entries(sems as Record<string, [number, number, [string, string, number][], number]>)) {
-            map[sem] = { subjects: (entry?.[2] ?? []).map(([code]) => ({ code })) };
-          }
-          byRoll[roll] = map;
-        }
-        setMarksByRoll(byRoll);
-      })
-      .catch(() => { /* attendance simply stays empty; the panel explains it */ });
-    fetch("/api/notices")
-      .then(async (res) => {
-        const body = await res.json();
-        if (!res.ok) throw new Error(body.error ?? `HTTP ${res.status}`);
-        return body as Payload;
-      })
-      .catch((err) => { active && setNoticesError(err.message); return null; })
-      .then((body) => { if (active && body) setNotices(body.notices.slice(0, 4)); });
-    return () => { active = false; };
+    return () => {
+      active = false;
+    };
   }, []);
 
   const me = useMemo<Student | null>(() => {
     const roll = liveAttendance?.roll.trim().toUpperCase();
     if (!students?.length || !roll) return null;
     return students
-      .filter(student => student.roll.trim().toUpperCase() === roll)
+      .filter((student) => student.roll.trim().toUpperCase() === roll)
       .reduce<Student | null>((latest, student) => {
-        if (!latest || student.ay > latest.ay ||
-          (student.ay === latest.ay && student.semester > latest.semester)) {
-          return student;
-        }
+        if (!latest || student.ay > latest.ay || (student.ay === latest.ay && student.semester > latest.semester)) return student;
         return latest;
       }, null);
   }, [students, liveAttendance?.roll]);
 
-  const subjectRows = useMemo<SubjectRow[]>(() => liveAttendance?.subjects?.map(s => ({
-    title: s.name || s.code, code: s.code, attended: s.present, held: s.held,
-    percent: s.percent, canSkip: s.canSkip, mustAttend: s.mustAttend,
-  })) ?? [], [liveAttendance]);
-  const overall = subjectRows.length
-    ? subjectRows.reduce((a, r) => a + r.attended, 0) / subjectRows.reduce((a, r) => a + r.held, 0) * 100
-    : 0;
+  const subjectRows = useMemo<SubjectRow[]>(
+    () =>
+      liveAttendance?.subjects?.map((subject) => ({
+        title: subject.name || subject.code,
+        code: subject.code,
+        attended: subject.present,
+        held: subject.held,
+        percent: subject.percent,
+        canSkip: subject.canSkip,
+        mustAttend: subject.mustAttend,
+      })) ?? [],
+    [liveAttendance],
+  );
 
-  const bestSem = useMemo(() => {
-    if (!me) return null;
-    const best = { semester: me.semester, sgpa: me.sgpa };
-    return best;
-  }, [me]);
+  const attendedTotal = subjectRows.reduce((total, row) => total + (row.held ? row.attended : 0), 0);
+  const heldTotal = subjectRows.reduce((total, row) => total + (row.held ? row.held : 0), 0);
+  const overall = heldTotal ? (attendedTotal / heldTotal) * 100 : 0;
 
+  const needsAttention = useMemo(
+    () =>
+      subjectRows
+        .filter((row) => {
+          const tone = attendanceTone(row.percent, row.held);
+          return tone === "risk" || tone === "borderline";
+        })
+        .sort((a, b) => a.percent - b.percent),
+    [subjectRows],
+  );
+  const atRiskCount = needsAttention.filter((row) => row.percent < POLICY).length;
+  const borderlineCount = needsAttention.length - atRiskCount;
+  const safeCount = subjectRows.filter((row) => attendanceTone(row.percent, row.held) === "safe").length;
+
+  const orderedRows = useMemo(() => {
+    if (!sortByRisk) return subjectRows;
+    const rank = { risk: 0, borderline: 1, safe: 2, none: 3 } as const;
+    return [...subjectRows].sort((a, b) => {
+      const toneA = attendanceTone(a.percent, a.held);
+      const toneB = attendanceTone(b.percent, b.held);
+      return rank[toneA] - rank[toneB] || a.percent - b.percent;
+    });
+  }, [subjectRows, sortByRisk]);
+
+  const visibleRows = showSafe
+    ? orderedRows
+    : orderedRows.filter((row) => attendanceTone(row.percent, row.held) !== "safe");
+
+  const notices = noticeStore.payload?.notices ?? [];
+  const noticesPreview = notices.slice(0, 4);
+  const unreadNotices = countUnread(notices, noticeStore.readIds);
   const newThisWeek = useMemo(() => {
-    if (!notices) return 0;
     const week = new Date(Date.now() - 7 * 86_400_000).toISOString().slice(0, 10);
-    return notices.filter((n) => n.isoDate >= week).length;
+    return notices.filter((notice) => notice.isoDate >= week).length;
   }, [notices]);
+  const noticesUsingCache = noticeStore.usingCache || (!online && Boolean(noticeStore.payload));
 
   const studentExams = useMemo(() => {
     if (!datesheet || !liveAttendance?.subjects?.length) return [];
-    const codes = liveAttendance.subjects.map((s) => s.code);
-    const sem = liveAttendance.selectedSemester || liveAttendance.semester;
-    return matchStudentExams(codes, datesheet, sem);
+    return matchStudentExams(
+      liveAttendance.subjects.map((subject) => subject.code),
+      datesheet,
+      liveAttendance.selectedSemester || liveAttendance.semester,
+    );
   }, [datesheet, liveAttendance]);
 
   const nextExam = useMemo(() => {
-    if (!studentExams.length) return null;
     const now = new Date();
     return (
       studentExams.find((exam) => {
         const { status } = getExamCountdown(exam.isoDate, now);
         return status === "today" || status === "upcoming";
-      }) ?? studentExams[0]
+      }) ?? null
     );
   }, [studentExams]);
 
+  const laterExams = nextExam ? studentExams.filter((exam) => exam.code !== nextExam.code) : studentExams;
+  const nextCountdown = nextExam ? getExamCountdown(nextExam.isoDate) : null;
+
+  const summaryLine = useMemo(() => {
+    if (nextExam && nextCountdown) {
+      const when = nextCountdown.status === "today"
+        ? "today"
+        : `in ${nextCountdown.daysRemaining} day${nextCountdown.daysRemaining === 1 ? "" : "s"}`;
+      if (needsAttention.length) {
+        return `Your next exam is ${when} and ${needsAttention.length} subject${needsAttention.length === 1 ? "" : "s"} need attention.`;
+      }
+      return `Your next exam is ${when}. Attendance is above the 75% line.`;
+    }
+    if (needsAttention.length) {
+      const base = `${atRiskCount} subject${atRiskCount === 1 ? " is" : "s are"} below the 75% line`;
+      return borderlineCount
+        ? `${base} and ${borderlineCount} more ${borderlineCount === 1 ? "is" : "are"} close to it.`
+        : `${base}.`;
+    }
+    if (heldTotal) return "Every subject is above the 75% attendance line.";
+    return "Sign in with NSUT IMS to see attendance, exam dates and notices.";
+  }, [nextExam, nextCountdown, needsAttention.length, atRiskCount, borderlineCount, heldTotal]);
+
   if (error) {
     return (
-      <div className="empty"><AlertTriangle size={30} /><h3>Could not load the dashboard</h3><p>{error}</p></div>
+      <div className="empty">
+        <AlertTriangle size={30} />
+        <h3>Could not load the dashboard</h3>
+        <p>{error}</p>
+      </div>
     );
   }
 
-  // Attendance is kept on this device between visits, so say whether what is on
-  // screen is a fresh sync or a saved snapshot.
-  const attendanceFresh = !!liveAttendance
-    && Date.now() - new Date(liveAttendance.syncedAt).getTime() < 6 * 60 * 60 * 1000;
+  const attendanceFresh =
+    !!liveAttendance && Date.now() - new Date(liveAttendance.syncedAt).getTime() < 6 * 60 * 60 * 1000;
   const rawName = (liveAttendance?.name || profileName).trim();
-  // IMS prints names in capitals; the familiar mixed case reads better here.
   const firstName = rawName
-    ? rawName.toLowerCase().replace(/(^|[\s-])([a-z])/g, (_, lead: string, letter: string) => `${lead}${letter.toUpperCase()}`).split(/\s+/)[0]
+    ? rawName
+        .toLowerCase()
+        .replace(/(^|[\s-])([a-z])/g, (_, lead: string, letter: string) => `${lead}${letter.toUpperCase()}`)
+        .split(/\s+/)[0]
     : "";
   const latestSgpa = me?.sgpa ?? null;
+
+  async function retryNotices() {
+    if (retryingNotices) return;
+    setRetryingNotices(true);
+    try {
+      await refreshNotices();
+    } finally {
+      setRetryingNotices(false);
+    }
+  }
+
+  function renderNoticePreview() {
+    if (noticeStore.error && !noticeStore.payload) {
+      return (
+        <div className="attEmpty">
+          <AlertTriangle size={24} />
+          <p>{noticeStore.error}</p>
+          <button className="ntSecondary" type="button" onClick={retryNotices} disabled={retryingNotices}>
+            <RefreshCw size={13} className={retryingNotices ? "attSpinIcon" : ""} /> Retry
+          </button>
+        </div>
+      );
+    }
+    if (!noticeStore.payload) {
+      return <Skeleton rows={4} />;
+    }
+    if (!noticesPreview.length) {
+      return (
+        <div className="attEmpty">
+          <BellRing size={24} />
+          <p>No notices on the board right now.</p>
+        </div>
+      );
+    }
+    return (
+      <div className="hubNoticeList">
+        {noticesPreview.map((notice) => {
+          const id = noticeId(notice);
+          const unread = !noticeStore.readIds.includes(id);
+          return (
+            <Link
+              className="hubNoticeRow"
+              key={id}
+              href={`/notices/${id}`}
+              onClick={() => markNoticeRead(id)}
+            >
+              <span className={`hubNoticeDot ${unread ? "on" : ""}`} aria-hidden="true" />
+              <span className="hubNoticeText">
+                <h4>
+                  {notice.title}
+                  {unread && isRecentNotice(notice.isoDate) && <span className="newBadge">New</span>}
+                </h4>
+                <p>
+                  {notice.department || "NSUT"} ·{" "}
+                  <time dateTime={notice.isoDate} title={notice.date}>
+                    {relativeNoticeDate(notice.isoDate)}
+                  </time>
+                </p>
+              </span>
+              <ChevronRight size={16} className="hubNoticeChev" aria-hidden="true" />
+            </Link>
+          );
+        })}
+      </div>
+    );
+  }
+
   return (
     <>
-      {/* ---- Section 1: greeting + identity + summary cards ---- */}
-      <section className="hubHero" suppressHydrationWarning>
+      {(!online || noticesUsingCache) && attendanceReady && (
+        <OfflineBanner
+          lastSynced={liveAttendance?.syncedAt ?? noticeStore.payload?.fetchedAt ?? null}
+          onRetry={retryNotices}
+          retrying={retryingNotices}
+        />
+      )}
+
+      {/* ---- Greeting + identity + dynamic summary ---- */}
+      <section className="hubHero">
         <div className="hubHeroText" suppressHydrationWarning>
-          {dateLine && <div className="hubDateLine" suppressHydrationWarning>{dateLine}</div>}
-          <h1 suppressHydrationWarning>
-            {greetingText}{firstName ? `, ${firstName}` : ""}
+          {dateLine && <div className="hubDateLine">{dateLine}</div>}
+          <h1>
+            {greetingText}
+            {firstName ? `, ${firstName}` : ""}
           </h1>
-          <p>Academic records, live IMS attendance and official notifications.</p>
+          <p className="hubSummary">{summaryLine}</p>
         </div>
         <div className="rollCard" suppressHydrationWarning>
-          <small>Student Roll</small>
-          <b suppressHydrationWarning>{liveAttendance ? liveAttendance.roll || "IMS connected" : "IMS not connected"}</b>
-          {liveAttendance && <span className="rollMeta" suppressHydrationWarning>{attendanceFresh ? "Live IMS" : "Saved attendance"} · synced {new Date(liveAttendance.syncedAt).toLocaleString()}</span>}
+          <small>Student roll</small>
+          <b>{liveAttendance ? liveAttendance.roll || "IMS connected" : "IMS not connected"}</b>
+          <span className="rollMeta">
+            {liveAttendance
+              ? `${attendanceFresh ? "Live IMS" : "Saved attendance"} · synced ${new Date(liveAttendance.syncedAt).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}`
+              : "Sign in to load your attendance"}
+          </span>
         </div>
       </section>
 
-      <section className="summaryCards" suppressHydrationWarning>
-        <div className="summaryCard attCard" suppressHydrationWarning>
-          <Activity className="scIcon att" size={20} />
+      {/* ---- Metric cards ---- */}
+      <section className="summaryCards">
+        <div className="summaryCard attCard">
+          <Activity className="scIcon att" size={20} aria-hidden="true" />
           <small>Overall attendance</small>
-          <b suppressHydrationWarning>{subjectRows.length ? `${overall.toFixed(1)}%` : "—"}</b>
-          <span className="scFoot" suppressHydrationWarning>{liveAttendance ? (attendanceFresh ? "Fetched from NSUT IMS" : "Saved from NSUT IMS") : "Connect to IMS first"}</span>
+          <b>{heldTotal ? `${overall.toFixed(1)}%` : "—"}</b>
+          <span className="scFoot">
+            {liveAttendance ? (attendanceFresh ? "Fetched from NSUT IMS" : "Saved from NSUT IMS") : "Connect to IMS first"}
+          </span>
         </div>
-        <a className="summaryCard sgpaCard" href={me ? `/student/${encodeURIComponent(me.roll)}` : "/results"} suppressHydrationWarning>
-          <GraduationCap className="scIcon sgpa" size={20} />
+        <a className="summaryCard sgpaCard" href={me ? `/student/${encodeURIComponent(me.roll)}` : "/results"}>
+          <GraduationCap className="scIcon sgpa" size={20} aria-hidden="true" />
           <small>Latest SGPA</small>
-          <b suppressHydrationWarning>{latestSgpa !== null ? latestSgpa.toFixed(2) : "—"}</b>
-          <span className="scFoot" suppressHydrationWarning>
+          <b>{latestSgpa !== null ? latestSgpa.toFixed(2) : "—"}</b>
+          <span className="scFoot">
             {me ? `Sem ${me.semester} · ${me.ay}-${String(me.ay + 1).slice(-2)} · ` : ""}
-            Result details <ArrowUpRight size={12} />
+            Result details <ArrowUpRight size={12} aria-hidden="true" />
           </span>
         </a>
-        <a className="summaryCard notCard" href="/notices" suppressHydrationWarning>
-          <span className="scIcon not"><BellRing size={18} /></span>
+        <Link className="summaryCard notCard" href="/notices">
+          <span className="scIcon not"><BellRing size={18} aria-hidden="true" /></span>
           <small>New notices</small>
-          <b suppressHydrationWarning>{notices ? String(notices.length).padStart(2, "0") : "—"}</b>
-          <span className="scFoot" suppressHydrationWarning>{newThisWeek} posted this week <ArrowUpRight size={12} /></span>
+          <b>{noticeStore.payload ? String(unreadNotices).padStart(2, "0") : "—"}</b>
+          <span className="scFoot">
+            {noticeStore.payload ? `${newThisWeek} posted this week · ${notices.length} total` : "Loading notices"}
+            <ArrowUpRight size={12} aria-hidden="true" />
+          </span>
+          <UnreadBadge count={unreadNotices} className="scCardBadge" />
+        </Link>
+        <a className="summaryCard examCard" href="#exams">
+          <CalendarDays className="scIcon exam" size={20} aria-hidden="true" />
+          <small>Upcoming examination</small>
+          <b>
+            {nextCountdown
+              ? nextCountdown.status === "today"
+                ? "Today"
+                : `${nextCountdown.daysRemaining}`
+              : "—"}
+            {nextCountdown && nextCountdown.status !== "today" && <span className="scUnit"> days</span>}
+          </b>
+          <span className="scFoot">
+            {nextExam
+              ? `${nextExam.code} · ${formatExamDate(nextExam.isoDate).formattedDate}`
+              : studentExams.length
+                ? "No upcoming exam on the sheet"
+                : "Sign in to match your date sheet"}
+            {nextExam && <ArrowUpRight size={12} aria-hidden="true" />}
+          </span>
         </a>
-        <div className="summaryCard pulseCard" suppressHydrationWarning>
-          <Users className="scIcon pulse" size={20} />
-          <small>Site visits</small>
-          <b suppressHydrationWarning>{visits !== null ? visits.toLocaleString("en-IN") : "—"}</b>
-          <span className="scFoot">browsing sessions so far</span>
-        </div>
       </section>
 
-      {/* ---- Section: Personalized End-Sem Date Sheet ---- */}
-      <section className="examScheduleSection" suppressHydrationWarning>
-        <div className="hubCard examScheduleCard" suppressHydrationWarning>
-          {/* Printable Letterhead (visible only on print) */}
+      {/* ---- Personalised date sheet ---- */}
+      <section className="examScheduleSection" id="exams">
+        <div className="hubCard examScheduleCard">
           <div className="examPrintLetterhead" suppressHydrationWarning>
             <b>NETAJI SUBHAS UNIVERSITY OF TECHNOLOGY</b>
             <span>Azad Hind Fauj Marg, Sector-3, Dwarka, New Delhi - 110078</span>
             <small>OFFICE OF THE CONTROLLER OF EXAMINATION</small>
             <h3>End-Semester Examination Date Sheet (Odd Semester 2026-27)</h3>
-            <div className="examPrintStudentMeta" suppressHydrationWarning>
+            <div className="examPrintStudentMeta">
               <span><b>Student:</b> {rawName || "Student"}</span>
               <span><b>Roll No:</b> {liveAttendance?.roll || "—"}</span>
               <span><b>Semester:</b> {liveAttendance?.selectedSemester || liveAttendance?.semester || "—"}</span>
-              <span><b>Notice Ref:</b> {"F. No. 220(298)/Mid & End 2026-27/2026/Exam/NSUT/1002"}</span>
             </div>
           </div>
 
-          <div className="hubCardHead examCardHead" suppressHydrationWarning>
+          <div className="hubCardHead examCardHead">
             <div>
-              <small className="panelKicker">End-Sem Date Sheet · Odd Semester 2026-27</small>
-              <h2 suppressHydrationWarning>{liveAttendance ? "Your exam schedule" : "End-sem exam schedule"}</h2>
+              <small className="panelKicker">End-sem date sheet · Odd Semester 2026-27</small>
+              <h2>{liveAttendance ? "Your exam schedule" : "End-sem exam schedule"}</h2>
             </div>
-            <div className="examScheduleActions" suppressHydrationWarning>
+            <div className="examScheduleActions">
               <span className="examScheduleNoticeTag">Tentative · COE 06/11/2026</span>
               {liveAttendance && studentExams.length > 0 && (
                 <button
@@ -385,36 +605,32 @@ function OverviewBody() {
                   onClick={() => window.print()}
                   title="Print your end-sem exam schedule"
                 >
-                  <Printer size={13} /> Print date sheet
+                  <Printer size={13} aria-hidden="true" /> Print date sheet
                 </button>
               )}
             </div>
           </div>
 
           {!liveAttendance ? (
-            <div className="examScheduleUnsigned" suppressHydrationWarning>
-              <CalendarDays size={26} className="examScheduleUnsignedIcon" />
+            <div className="examScheduleUnsigned">
+              <CalendarDays size={26} className="examScheduleUnsignedIcon" aria-hidden="true" />
               <div className="examScheduleUnsignedText">
-                <h3>Personalized exam dates for your subjects</h3>
-                <p>
-                  Sign in to NSUT IMS above to automatically match your registered subjects with the official end-sem date sheet and view your exam schedule.
-                </p>
+                <h3>Personalised exam dates for your subjects</h3>
+                <p>Sign in to NSUT IMS above to match your registered subjects with the official end-sem date sheet.</p>
               </div>
             </div>
           ) : studentExams.length === 0 ? (
-            <div className="examScheduleUnsigned" suppressHydrationWarning>
-              <CalendarDays size={26} className="examScheduleUnsignedIcon" />
+            <div className="examScheduleUnsigned">
+              <CalendarDays size={26} className="examScheduleUnsignedIcon" aria-hidden="true" />
               <div className="examScheduleUnsignedText">
-                <h3>No written exams scheduled in tentative date sheet</h3>
-                <p>
-                  Your current registered subjects ({liveAttendance.subjects.map((s) => s.code).join(", ")}) may be practical or continuous evaluation courses.
-                </p>
+                <h3>No written exams scheduled in the tentative date sheet</h3>
+                <p>Your current subjects are practical or continuous-evaluation courses.</p>
               </div>
             </div>
           ) : (
             <>
-              {nextExam && (
-                <div className="examNextSpotlight" suppressHydrationWarning>
+              {nextExam && nextCountdown && (
+                <div className="examNextSpotlight">
                   <div className="examNextSpotlightContent">
                     <span className="examNextBadge">Next upcoming exam</span>
                     <h3>{nextExam.name}</h3>
@@ -424,26 +640,22 @@ function OverviewBody() {
                         {formatExamDate(nextExam.isoDate).dayOfWeek}, {formatExamDate(nextExam.isoDate).formattedDate}
                       </span>
                       <span className="examNextShift">
-                        <Clock size={12} /> {nextExam.shift} ({nextExam.time})
+                        <Clock size={12} aria-hidden="true" /> {nextExam.shift} · {nextExam.time}
                       </span>
                     </div>
                   </div>
                   <div className="examNextCountdown">
-                    <span className={`examCountdownBadge ${getExamCountdown(nextExam.isoDate).status}`} suppressHydrationWarning>
-                      {getExamCountdown(nextExam.isoDate).label}
-                    </span>
+                    <span className={`examCountdownBadge ${nextCountdown.status}`}>{nextCountdown.label}</span>
                   </div>
                 </div>
               )}
 
-              <div className="studentExamList" suppressHydrationWarning>
-                {studentExams.map((exam) => {
+              <div className="studentExamList">
+                {laterExams.map((exam) => {
                   const countdown = getExamCountdown(exam.isoDate);
                   const { dayOfWeek, formattedDate } = formatExamDate(exam.isoDate);
-                  const isNext = nextExam?.code === exam.code;
-
                   return (
-                    <div key={exam.code} className={`studentExamRow ${isNext ? "isNextExam" : ""}`} suppressHydrationWarning>
+                    <div key={exam.code} className={`studentExamRow ${countdown.status === "passed" ? "isPassed" : ""}`}>
                       <div className="studentExamDate">
                         <b>{formattedDate.split(" ")[0]}</b>
                         <span>{formattedDate.split(" ")[1]}</span>
@@ -456,24 +668,25 @@ function OverviewBody() {
                         </div>
                         <div className="studentExamSubRow">
                           <span className="studentExamShift">
-                            <Clock size={12} /> {exam.shift} · {exam.time}
+                            <Clock size={12} aria-hidden="true" /> {exam.shift} · {exam.time}
                           </span>
                         </div>
                       </div>
                       <div className="studentExamStatus">
-                        <span className={`examCountdownBadge ${countdown.status}`} suppressHydrationWarning>
-                          {countdown.label}
-                        </span>
+                        <span className={`examCountdownBadge ${countdown.status}`}>{countdown.label}</span>
                       </div>
                     </div>
                   );
                 })}
+                {!nextExam && !laterExams.length && (
+                  <p className="examEmptyList">No exams are left on this date sheet.</p>
+                )}
               </div>
 
               <div className="examScheduleFooter">
                 <span>Shift 1: 10:00 AM – 01:00 PM · Shift 2: 02:00 PM – 05:00 PM</span>
                 <span className="examDiscrepancy">
-                  Clashes / Discrepancies: <a href="mailto:examination@nsut.ac.in">examination@nsut.ac.in</a>
+                  Clashes or discrepancies? Email <a href="mailto:examination@nsut.ac.in">examination@nsut.ac.in</a>
                 </span>
               </div>
             </>
@@ -481,166 +694,215 @@ function OverviewBody() {
         </div>
       </section>
 
-      {/* ---- Section 2: attendance snapshot + important notices, side by side ---- */}
+      {/* ---- Attendance + notices/rail ---- */}
       <section className="duoGrid">
-        <div className="hubCard attPanel">
+        <div className="hubCard attPanel" id="attendance">
           {attendanceRefreshing && (
             <div className="attRefreshOverlay" role="status" aria-live="polite">
               <div className="attRefreshOverlayInner">
-                <Loader2 size={36} className="attSpinIcon" aria-hidden="true" />
-                <strong>Updating attendance...</strong>
-                <span>Fetching latest records from IMS</span>
+                <Loader2 size={34} className="attSpinIcon" aria-hidden="true" />
+                <strong>Updating attendance…</strong>
+                <span>Fetching the latest records from IMS</span>
               </div>
             </div>
           )}
+
           <div className="hubCardHead">
             <div>
               <small className="panelKicker">Live status</small>
               <h2>Attendance</h2>
             </div>
             <div className="attPanelActions">
+              <span className="attSyncedInline">
+                {liveAttendance
+                  ? `Last synced ${new Date(liveAttendance.syncedAt).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}`
+                  : "Not synced yet"}
+              </span>
               {liveAttendance && (
                 <button
                   className="attRefreshButton"
                   type="button"
                   onClick={() => requestAttendanceRefresh()}
-                  disabled={attendanceRefreshing}
-                  title={`Last synced ${new Date(liveAttendance.syncedAt).toLocaleString()} — fetch the latest attendance from NSUT IMS. If your IMS ID is saved on this device, only the CAPTCHA is asked for.`}
+                  disabled={attendanceRefreshing || !online}
+                  title={
+                    online
+                      ? "Fetch the latest attendance from NSUT IMS. If your IMS ID is saved on this device, only the CAPTCHA is asked for."
+                      : "You are offline. Reconnect to refresh attendance."
+                  }
                 >
-                  <RefreshCw size={13} className={attendanceRefreshing ? "attSpinIcon" : undefined} /> {attendanceRefreshing ? "Updating..." : "Refresh from IMS"}
+                  <RefreshCw size={13} className={attendanceRefreshing ? "attSpinIcon" : undefined} aria-hidden="true" />
+                  {attendanceRefreshing ? "Updating…" : online ? "Refresh from IMS" : "Offline"}
                 </button>
               )}
-              <span className="policyTag">75% minimum</span>
+              <button className="policyTag policyTagButton" type="button" title="NSUT requires 75% attendance per subject. The dashboards counts real IMS classes only.">
+                75% minimum
+              </button>
             </div>
           </div>
 
-          {!liveAttendance || !subjectRows.length ? (
+          {!attendanceReady ? (
+            <Skeleton rows={5} />
+          ) : !liveAttendance || !subjectRows.length ? (
             <div className="attEmpty">
-              <TrendingUp size={26} />
+              <TrendingUp size={26} aria-hidden="true" />
               <p>Sign in to NSUT IMS to load your real subject-wise attendance. No estimated attendance is shown.</p>
             </div>
           ) : (
             <div className="attSummary">
               <Gauge percent={overall} />
               <div className="attSummaryText">
-                <h3>{POLICY * 100}% safety line</h3>
-                <p>Know exactly how many classes you can miss without falling below the minimum.</p>
+                <h3>{POLICY}% safety line</h3>
+                <p className="attInsight">
+                  {overall >= POLICY
+                    ? `You are ${(overall - POLICY).toFixed(1)}% above the 75% line.`
+                    : `You are ${(POLICY - overall).toFixed(1)}% below the 75% line.`}
+                </p>
+                <p className="attTotals">
+                  <b>{attendedTotal}</b> attended of <b>{heldTotal}</b> classes across {subjectRows.filter((row) => row.held > 0).length} subjects.
+                </p>
                 <div className="legend">
-                  <span><i className="dot attended" /> Attended</span>
-                  <span><i className="dot minimum" /> {POLICY * 100}% minimum</span>
+                  <span><i className="dot attended" aria-hidden="true" /> Attended</span>
+                  <span><i className="dot minimum" aria-hidden="true" /> 75% marker</span>
                 </div>
               </div>
             </div>
           )}
 
           {subjectRows.length > 0 && (
-            <div className="attRows">
-              {subjectRows.map((r) => {
-                const expanded = selectedAttendanceSubject === r.code;
-                const months = subjectAttendanceMonths(liveAttendance?.daily, r.code);
-                return (
-                  <div className={`attRow ${expanded ? "expanded" : ""}`} key={r.code}>
-                    <button
-                      className="attSubjectButton"
-                      type="button"
-                      aria-expanded={expanded}
-                      onClick={() => {
-                        if (expanded) {
-                          setSelectedAttendanceSubject(null);
-                        } else {
-                          setSelectedAttendanceSubject(r.code);
-                          setAttendanceCalendarMonth(months.length ? months[months.length - 1] : "");
-                        }
-                      }}
-                    >
-                      <span className="attRowText">
-                        <h4>
-                          {r.title}
-                          {/* The IMS subject code follows the subject name. */}
-                          {r.title !== r.code && <span className="attCode">{r.code}</span>}
-                        </h4>
-                        <p><b>{r.attended}/{r.held}</b> classes</p>
-                        <p className="attSkip">{r.held === 0
-                          ? "No classes held yet"
-                          : r.percent >= POLICY * 100
-                            ? `Can miss ${r.canSkip} more classes and stay at 75%`
-                            : `Attend ${r.mustAttend ?? 0} consecutive classes to reach 75%`}</p>
-                      </span>
-                      <span className="attSubjectActions">
-                        <b className={`attPct ${r.percent < POLICY * 100 ? "low" : ""}`}>{r.percent.toFixed(1)}%</b>
-                        <ChevronRight size={16} className={expanded ? "attSubjectChevron expanded" : "attSubjectChevron"} />
-                      </span>
-                    </button>
-                    {expanded && liveAttendance && (
-                      <SubjectAttendanceCalendar
-                        subject={r}
-                        daily={liveAttendance.daily ?? []}
-                        attendanceLegend={liveAttendance.attendanceLegend}
-                        statusLegend={liveAttendance.statusLegend}
-                        month={attendanceCalendarMonth}
-                        months={months}
-                        onMonthChange={setAttendanceCalendarMonth}
-                      />
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+            <>
+              <div className="attListTools">
+                <button
+                  className="attToolButton"
+                  type="button"
+                  onClick={() => setSortByRisk((value) => !value)}
+                  aria-pressed={sortByRisk}
+                >
+                  <ArrowDownUp size={14} aria-hidden="true" />
+                  {sortByRisk ? "Risk first" : "Default order"}
+                </button>
+                {safeCount > 0 && (
+                  <button
+                    className="attToolButton"
+                    type="button"
+                    onClick={() => setShowSafe((value) => !value)}
+                    aria-expanded={showSafe}
+                  >
+                    {showSafe ? `Hide ${safeCount} safe subject${safeCount === 1 ? "" : "s"}` : `Show ${safeCount} safe subject${safeCount === 1 ? "" : "s"}`}
+                    <ChevronRight size={14} className={showSafe ? "isOpen" : ""} aria-hidden="true" />
+                  </button>
+                )}
+              </div>
+
+              <div className="attRows">
+                {visibleRows.map((row) => {
+                  const expanded = selectedAttendanceSubject === row.code;
+                  const tone = attendanceTone(row.percent, row.held);
+                  const months = subjectAttendanceMonths(liveAttendance?.daily, row.code);
+                  const percentLabel = row.held ? `${row.percent.toFixed(1)}%` : "—";
+                  return (
+                    <div className={`attRow attRow--${tone} ${expanded ? "expanded" : ""}`} key={row.code} id={`att-row-${row.code}`}>
+                      <button
+                        className="attSubjectButton"
+                        type="button"
+                        aria-expanded={expanded}
+                        onClick={() => {
+                          if (expanded) {
+                            setSelectedAttendanceSubject(null);
+                          } else {
+                            setSelectedAttendanceSubject(row.code);
+                            setAttendanceCalendarMonth(months.length ? months[months.length - 1] : "");
+                          }
+                        }}
+                      >
+                        <span className="attRowText">
+                          <span className="attRowTitle">
+                            {row.title}
+                            {row.title !== row.code && <span className="attCode">{row.code}</span>}
+                          </span>
+                          <span className="attRowStats">
+                            {row.held ? <><b>{row.attended}/{row.held}</b> classes</> : "No classes held yet"}
+                          </span>
+                          {row.held > 0 && <AttendanceBar percent={row.percent} tone={tone} label={row.title} />}
+                          <span className="attRowFoot">
+                            <StatusChip tone={tone} />
+                            <span className={`attAction ${tone}`}>{actionLine(row, tone)}</span>
+                          </span>
+                        </span>
+                        <span className="attSubjectActions">
+                          <b className={`attPct ${tone}`}>{percentLabel}</b>
+                          <ChevronRight size={16} className={expanded ? "attSubjectChevron expanded" : "attSubjectChevron"} aria-hidden="true" />
+                        </span>
+                      </button>
+
+                      {expanded && liveAttendance && (
+                        <div className="attExpanded">
+                          {row.held > 0 && <SkipEstimator subject={row} />}
+                          <SubjectAttendanceCalendar
+                            subject={row}
+                            daily={liveAttendance.daily ?? []}
+                            attendanceLegend={liveAttendance.attendanceLegend}
+                            statusLegend={liveAttendance.statusLegend}
+                            month={attendanceCalendarMonth}
+                            months={months}
+                            onMonthChange={setAttendanceCalendarMonth}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </>
           )}
         </div>
 
-        <div className="hubCard noticesPanel">
-          <div className="hubCardHead">
-            <div>
-              <small className="panelKicker">Circulars &amp; orders</small>
-              <h2>Important notices</h2>
+        <div className="duoRail">
+          <div className="hubCard noticesPanel">
+            <div className="hubCardHead">
+              <div>
+                <small className="panelKicker">Circulars &amp; orders</small>
+                <h2>Important notices</h2>
+              </div>
+              <Link className="panelLink" href="/notices">
+                View all notices <ArrowUpRight size={13} aria-hidden="true" />
+              </Link>
             </div>
-            <Link className="panelLink" href="/notices">All notices <ArrowUpRight size={13} /></Link>
-          </div>
 
-          {noticesError ? (
-            <div className="attEmpty">
-              <AlertTriangle size={24} />
-              <p>{noticesError}</p>
-            </div>
-          ) : !notices ? (
-            <div className="loading"><Loader2 className="spin" size={22} /><p>Loading notices…</p></div>
-          ) : (
-            <div className="hubNoticeList">
-              {notices.map((n) => (
-                <a className="hubNoticeRow" key={n.href} href={n.href} target="_blank" rel="noreferrer noopener">
-                  <span className="hubNoticeIcon"><BellRing size={15} /></span>
-                  <span className="hubNoticeText">
-                    <h4>{n.title}{isRecentNotice(n.isoDate) && <span className="newBadge">New</span>}</h4>
-                    <p>{n.department || "NSUT"} · <time dateTime={n.isoDate}>{n.date}</time></p>
-                  </span>
-                  <ChevronRight size={16} className="hubNoticeChev" />
-                </a>
-              ))}
-            </div>
-          )}
+            {noticesUsingCache && noticeStore.payload && (
+              <p className="panelOffline">
+                Offline · saved {relativeNoticeDate(new Date(noticeStore.payload.fetchedAt).toISOString().slice(0, 10))}
+              </p>
+            )}
+
+            {renderNoticePreview()}
+          </div>
         </div>
       </section>
 
-      {/* ---- Section 3: popular hangouts ---- */}
+      {/* ---- Campus spots ---- */}
       <section className="hangouts">
         <div className="hubCardHead hangoutsHead">
           <div>
             <small className="panelKicker">Campus spots</small>
             <h2>Popular hangouts</h2>
           </div>
-          <button className="panelLink campusExploreButton" type="button" onClick={() => setCampusMapOpen(true)}>Explore campus <ArrowUpRight size={13} /></button>
+          <button className="panelLink campusExploreButton" type="button" onClick={() => setCampusMapOpen(true)}>
+            Explore campus <ArrowUpRight size={13} aria-hidden="true" />
+          </button>
         </div>
         <div className="hangoutGrid sharedHangoutGrid">
-          {SHARED_HANGOUTS.map((h, i) => (
-            <a className="hangoutCard sharedHangoutCard" key={h.url} href={h.url} target="_blank" rel="noreferrer">
+          {SHARED_HANGOUTS.map((hangout) => (
+            <a className="hangoutCard sharedHangoutCard" key={hangout.url} href={hangout.url} target="_blank" rel="noreferrer">
               <div className="hangoutImg sharedHangoutPhoto">
-                <img src={h.img} alt={h.alt} loading="lazy" />
-                <span className="sharedHangoutPhotoLabel"><MapPin size={13} /> Popular hangout</span>
+                <img src={hangout.img} alt={hangout.alt} loading="lazy" width="900" height="560" />
+                <span className="sharedHangoutPhotoLabel"><MapPin size={13} aria-hidden="true" /> Popular hangout</span>
               </div>
               <div className="hangoutMeta">
-                <div className="hangoutName"><h3>{h.name}</h3><p><MapPin size={12} /> {h.place}</p></div>
-                <ArrowUpRight size={16} />
+                <div className="hangoutName">
+                  <h3>{hangout.name}</h3>
+                  <p><MapPin size={12} aria-hidden="true" /> {hangout.place}</p>
+                </div>
+                <ArrowUpRight size={16} aria-hidden="true" />
               </div>
             </a>
           ))}
@@ -648,25 +910,28 @@ function OverviewBody() {
       </section>
 
       {campusMapOpen && (
-        <div className="campusMapOverlay" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setCampusMapOpen(false); }}>
+        <div
+          className="campusMapOverlay"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setCampusMapOpen(false);
+          }}
+        >
           <section className="campusMapDialog" role="dialog" aria-modal="true" aria-label="NSUT campus map">
-            <div className="campusMapHeader"><div><small className="panelKicker">Campus overview</small><h2>Campus map</h2></div><button type="button" className="campusMapClose" aria-label="Close campus map" onClick={() => setCampusMapOpen(false)}><X size={20} /></button></div>
-            <img className="campusMapImage" src="/campus-map.png" alt="Illustrated map of the NSUT campus with academic blocks, hostels, grounds, library and main gate" />
+            <div className="campusMapHeader">
+              <div><small className="panelKicker">Campus overview</small><h2>Campus map</h2></div>
+              <button type="button" className="campusMapClose" aria-label="Close campus map" onClick={() => setCampusMapOpen(false)}>
+                <X size={20} />
+              </button>
+            </div>
+            <img
+              className="campusMapImage"
+              src="/campus-map.png"
+              alt="Illustrated map of the NSUT campus with academic blocks, hostels, grounds, library and main gate"
+            />
           </section>
         </div>
       )}
-
-
     </>
   );
 }
-
-type Notice = {
-  date: string;
-  isoDate: string;
-  title: string;
-  publishedBy: string;
-  department: string;
-  href: string;
-};
-type Payload = { notices: Notice[]; fetchedAt: number; source: string };

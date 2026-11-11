@@ -171,7 +171,7 @@ export default function Community() {
 
   return (
     <HubShell>
-      <main className="cmShell">
+      <div className="cmShell">
         <section className="cmHero">
           <div>
             <span className="panelKicker">Campus social</span>
@@ -417,7 +417,7 @@ export default function Community() {
           NsutNest is an unofficial student project. Community threads live on r/NSUT_Delhi, which is
           run by students — not by the university.
         </p>
-      </main>
+      </div>
 
       {mapOpen && (
         <div

@@ -108,14 +108,14 @@ export default function StudentProfile() {
   const markedSemesters = SEMESTERS.filter((sem) => marks[sem]?.subjects?.length);
 
   const shell = (children: React.ReactNode) => (
-    <main className="profileShell">
+    <div className="profileShell">
       <Link href="/results" className="backLink"><ArrowLeft size={16} /> Back to results</Link>
       {children}
       <footer className="profileFooter">
         <BrandLogo compact />
         <p>Unofficial student project · Verify all entries against the original gazette.</p>
       </footer>
-    </main>
+    </div>
   );
 
   if (error) return shell(

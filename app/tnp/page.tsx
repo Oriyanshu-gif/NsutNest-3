@@ -15,7 +15,7 @@ const LINKS = [
 export default function Tnp() {
   return (
     <HubShell>
-      <main className="tnpShell">
+      <div className="tnpShell">
         <header className="tnpHeader">
           <div>
             <small className="panelKicker">Career opportunities</small>
@@ -55,7 +55,7 @@ export default function Tnp() {
           <a className="tnpContactLink" href={TNP_CONTACT} target="_blank" rel="noreferrer noopener">Full contact list on tnpnsut.in <ExternalLink size={13} /></a>
         </section>
         <footer className="hubFooter"><p>NSUT Nest · unofficial student project</p><small>Always verify placement details with official sources.</small></footer>
-      </main>
+      </div>
     </HubShell>
   );
 }
