@@ -58,7 +58,6 @@ import {
 import HubShell from "./app-shell";
 import { SubjectAttendanceCalendar } from "./attendance-calendar";
 import {
-  AttendanceBar,
   attendanceTone,
   OfflineBanner,
   Skeleton,
@@ -131,7 +130,7 @@ function attendBudget(attended: number, held: number): number {
 function actionLine(row: SubjectRow, tone: ReturnType<typeof attendanceTone>): string {
   if (tone === "none") return "No classes held yet";
   if (row.percent < POLICY) return `Attend ${Math.ceil(attendBudget(row.attended, row.held))} consecutive classes to reach 75%`;
-  if (tone === "borderline") return `Can miss ${skipBudget(row.attended, row.held)} more classes — right at the 75% line`;
+  if (tone === "borderline") return `Can miss ${skipBudget(row.attended, row.held)} more classes. You are right at the 75% line.`;
   return `Can miss ${skipBudget(row.attended, row.held)} more classes and stay at 75%`;
 }
 
@@ -170,32 +169,61 @@ function Gauge({ percent }: { percent: number }) {
 }
 
 function SkipEstimator({ subject }: { subject: SubjectRow }) {
-  const [skip, setSkip] = useState(0);
-  const projected = subject.held + skip > 0 ? (subject.attended / (subject.held + skip)) * 100 : 0;
+  const [mode, setMode] = useState<"miss" | "attend">("miss");
+  const [count, setCount] = useState(0);
+  const isAttend = mode === "attend";
+  const projected = isAttend
+    ? ((subject.attended + count) / (subject.held + count)) * 100
+    : (subject.attended / (subject.held + count)) * 100;
   const below = projected < POLICY;
 
   return (
     <div className="skipEstimator">
       <div className="skipHead">
-        <span className="skipTitle">What if I skip?</span>
+        <div className="skipHeadText">
+          <span className="skipTitle">What if…</span>
+          <small className="skipSub">Project your attendance</small>
+        </div>
         <span className="skipTag">Estimate</span>
       </div>
+      <div className="skipModes" role="group" aria-label="Choose an attendance scenario">
+        <button
+          type="button"
+          className={!isAttend ? "active" : ""}
+          aria-pressed={!isAttend}
+          onClick={() => setMode("miss")}
+        >
+          I miss classes
+        </button>
+        <button
+          type="button"
+          className={isAttend ? "active" : ""}
+          aria-pressed={isAttend}
+          onClick={() => setMode("attend")}
+        >
+          I attend classes
+        </button>
+      </div>
       <div className="skipBody">
-        <div className="skipStepper" role="group" aria-label="Number of classes to skip">
-          <button type="button" onClick={() => setSkip((value) => Math.max(0, value - 1))} disabled={skip === 0} aria-label="Skip one fewer class">
-            <Minus size={15} aria-hidden="true" />
+        <div className="skipStepper" role="group" aria-label={`Number of classes to ${isAttend ? "attend" : "miss"}`}>
+          <button type="button" onClick={() => setCount((value) => Math.max(0, value - 1))} disabled={count === 0} aria-label={`${isAttend ? "Attend" : "Miss"} one fewer class`}>
+            <Minus size={16} aria-hidden="true" />
           </button>
-          <span className="skipValue"><b>{skip}</b> class{skip === 1 ? "" : "es"}</span>
-          <button type="button" onClick={() => setSkip((value) => Math.min(20, value + 1))} disabled={skip >= 20} aria-label="Skip one more class">
-            <Plus size={15} aria-hidden="true" />
+          <span className="skipValue"><b>{count}</b><small>class{count === 1 ? "" : "es"}</small></span>
+          <button type="button" onClick={() => setCount((value) => Math.min(20, value + 1))} disabled={count >= 20} aria-label={`${isAttend ? "Attend" : "Miss"} one more class`}>
+            <Plus size={16} aria-hidden="true" />
           </button>
         </div>
-        <p className="skipResult">
-          Attendance becomes <b className={below ? "low" : ""}>{projected.toFixed(1)}%</b>
-          {below ? " — below the 75% minimum." : "."}
+        <p className="skipResult" aria-live="polite">
+          Projected <b className={below ? "low" : ""}>{projected.toFixed(1)}%</b>
+          <span className={`skipVerdict ${below ? "low" : "good"}`}>{below ? "Below 75%" : "Above 75%"}</span>
         </p>
       </div>
-      <small className="skipNote">Estimate only: assumes those classes are held and you attend none of them.</small>
+      <small className="skipNote">
+        {isAttend
+          ? "Assumes those future classes are held and you attend every one."
+          : "Assumes those future classes are held and you miss every one."}
+      </small>
     </div>
   );
 }
@@ -221,7 +249,6 @@ function OverviewBody() {
   const [selectedAttendanceSubject, setSelectedAttendanceSubject] = useState<string | null>(null);
   const [attendanceCalendarMonth, setAttendanceCalendarMonth] = useState("");
   const [sortByRisk, setSortByRisk] = useState(true);
-  const [showSafe, setShowSafe] = useState(false);
   const [campusMapOpen, setCampusMapOpen] = useState(false);
   const [greetingText, setGreetingText] = useState("Welcome");
   const [dateLine, setDateLine] = useState("");
@@ -336,7 +363,6 @@ function OverviewBody() {
   );
   const atRiskCount = needsAttention.filter((row) => row.percent < POLICY).length;
   const borderlineCount = needsAttention.length - atRiskCount;
-  const safeCount = subjectRows.filter((row) => attendanceTone(row.percent, row.held) === "safe").length;
 
   const orderedRows = useMemo(() => {
     if (!sortByRisk) return subjectRows;
@@ -348,9 +374,6 @@ function OverviewBody() {
     });
   }, [subjectRows, sortByRisk]);
 
-  const visibleRows = showSafe
-    ? orderedRows
-    : orderedRows.filter((row) => attendanceTone(row.percent, row.held) !== "safe");
 
   const notices = noticeStore.payload?.notices ?? [];
   const noticesPreview = notices.slice(0, 4);
@@ -693,36 +716,37 @@ function OverviewBody() {
             </div>
           )}
 
-          <div className="hubCardHead">
-            <div>
-              <small className="panelKicker">Live status</small>
+          <div className="hubCardHead attHead">
+            <div className="attHeadText">
+              <small className="panelKicker attKicker">
+                <span className="attLiveDot" aria-hidden="true" />
+                Live status
+              </small>
               <h2>Attendance</h2>
-            </div>
-            <div className="attPanelActions">
               <span className="attSyncedInline">
                 {liveAttendance
-                  ? `Last synced ${new Date(liveAttendance.syncedAt).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}`
+                  ? `Synced ${new Date(liveAttendance.syncedAt).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}`
                   : "Not synced yet"}
               </span>
+            </div>
+            <div className="attPanelActions">
               {liveAttendance && (
                 <button
                   className="attRefreshButton"
                   type="button"
                   onClick={() => requestAttendanceRefresh()}
                   disabled={attendanceRefreshing || !online}
+                  aria-label={online ? "Refresh attendance from IMS" : "Offline. Reconnect to refresh attendance."}
                   title={
                     online
                       ? "Fetch the latest attendance from NSUT IMS. If your IMS ID is saved on this device, only the CAPTCHA is asked for."
                       : "You are offline. Reconnect to refresh attendance."
                   }
                 >
-                  <RefreshCw size={13} className={attendanceRefreshing ? "attSpinIcon" : undefined} aria-hidden="true" />
-                  {attendanceRefreshing ? "Updating…" : online ? "Refresh from IMS" : "Offline"}
+                  <RefreshCw size={14} className={attendanceRefreshing ? "attSpinIcon" : undefined} aria-hidden="true" />
+                  {attendanceRefreshing ? "Updating…" : online ? "Refresh IMS" : "Offline"}
                 </button>
               )}
-              <button className="policyTag policyTagButton" type="button" title="NSUT requires 75% attendance per subject. The dashboards counts real IMS classes only.">
-                75% minimum
-              </button>
             </div>
           </div>
 
@@ -737,18 +761,19 @@ function OverviewBody() {
             <div className="attSummary">
               <Gauge percent={overall} />
               <div className="attSummaryText">
-                <h3>{POLICY}% safety line</h3>
-                <p className="attInsight">
-                  {overall >= POLICY
-                    ? `You are ${(overall - POLICY).toFixed(1)}% above the 75% line.`
-                    : `You are ${(POLICY - overall).toFixed(1)}% below the 75% line.`}
-                </p>
-                <p className="attTotals">
-                  <b>{attendedTotal}</b> attended of <b>{heldTotal}</b> classes across {subjectRows.filter((row) => row.held > 0).length} subjects.
-                </p>
-                <div className="legend">
-                  <span><i className="dot attended" aria-hidden="true" /> Attended</span>
-                  <span><i className="dot minimum" aria-hidden="true" /> 75% marker</span>
+                <div className="attSummaryTop">
+                  <div>
+                    <span className="attSummaryEyebrow">Overall standing</span>
+                    <h3>{overall >= POLICY ? "Above 75% line" : "Below 75% line"}</h3>
+                  </div>
+                  <span className={`attDelta ${overall >= POLICY ? "good" : "low"}`}>
+                    {overall >= POLICY ? "+" : "−"}{Math.abs(overall - POLICY).toFixed(1)} pts
+                  </span>
+                </div>
+                <div className="attSummaryStats">
+                  <div><b>{attendedTotal}</b><span>attended</span></div>
+                  <div><b>{heldTotal}</b><span>classes</span></div>
+                  <div><b>{subjectRows.length}</b><span>subjects</span></div>
                 </div>
               </div>
             </div>
@@ -757,34 +782,29 @@ function OverviewBody() {
           {subjectRows.length > 0 && (
             <>
               <div className="attListTools">
-                <button
-                  className="attToolButton"
-                  type="button"
-                  onClick={() => setSortByRisk((value) => !value)}
-                  aria-pressed={sortByRisk}
-                >
-                  <ArrowDownUp size={14} aria-hidden="true" />
-                  {sortByRisk ? "Risk first" : "Default order"}
-                </button>
-                {safeCount > 0 && (
+                <span className="attListLabel">
+                  Subject breakdown
+                  <small>{subjectRows.length}</small>
+                </span>
+                <div className="attListActions">
                   <button
                     className="attToolButton"
                     type="button"
-                    onClick={() => setShowSafe((value) => !value)}
-                    aria-expanded={showSafe}
+                    onClick={() => setSortByRisk((value) => !value)}
+                    aria-pressed={sortByRisk}
                   >
-                    {showSafe ? `Hide ${safeCount} safe subject${safeCount === 1 ? "" : "s"}` : `Show ${safeCount} safe subject${safeCount === 1 ? "" : "s"}`}
-                    <ChevronRight size={14} className={showSafe ? "isOpen" : ""} aria-hidden="true" />
+                    <ArrowDownUp size={14} aria-hidden="true" />
+                    {sortByRisk ? "Risk first" : "Default order"}
                   </button>
-                )}
+                </div>
               </div>
 
               <div className="attRows">
-                {visibleRows.map((row) => {
+                {orderedRows.map((row) => {
                   const expanded = selectedAttendanceSubject === row.code;
                   const tone = attendanceTone(row.percent, row.held);
                   const months = subjectAttendanceMonths(liveAttendance?.daily, row.code);
-                  const percentLabel = row.held ? `${row.percent.toFixed(1)}%` : "—";
+                  const percentLabel = row.held ? `${row.percent.toFixed(1)}%` : "";
                   return (
                     <div className={`attRow attRow--${tone} ${expanded ? "expanded" : ""}`} key={row.code} id={`att-row-${row.code}`}>
                       <button
@@ -806,16 +826,17 @@ function OverviewBody() {
                             {row.title !== row.code && <span className="attCode">{row.code}</span>}
                           </span>
                           <span className="attRowStats">
-                            {row.held ? <><b>{row.attended}/{row.held}</b> classes</> : "No classes held yet"}
+                            {row.held ? <><b>{row.attended}</b> of <b>{row.held}</b> classes</> : "No classes held yet"}
                           </span>
-                          {row.held > 0 && <AttendanceBar percent={row.percent} tone={tone} label={row.title} />}
-                          <span className="attRowFoot">
-                            <StatusChip tone={tone} />
-                            <span className={`attAction ${tone}`}>{actionLine(row, tone)}</span>
-                          </span>
+                          {row.held > 0 && (
+                            <span className="attRowFoot">
+                              <StatusChip tone={tone} />
+                              <span className={`attAction ${tone}`}>{actionLine(row, tone)}</span>
+                            </span>
+                          )}
                         </span>
                         <span className="attSubjectActions">
-                          <b className={`attPct ${tone}`}>{percentLabel}</b>
+                          {percentLabel && <b className={`attPct ${tone}`}>{percentLabel}</b>}
                           <ChevronRight size={16} className={expanded ? "attSubjectChevron expanded" : "attSubjectChevron"} aria-hidden="true" />
                         </span>
                       </button>
