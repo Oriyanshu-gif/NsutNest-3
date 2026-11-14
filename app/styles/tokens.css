@@ -1,0 +1,82 @@
+/*
+ * NSUT Nest design tokens.
+ *
+ * Dark is the default. The light theme keeps identical token names, so every
+ * Tailwind utility and component works in both themes without overrides.
+ * These tokens are prefixed with --color- so the legacy CSS can coexist while
+ * the new shell is built in the next step.
+ */
+:root {
+  color-scheme: dark;
+
+  --color-bg: #0b0f17;
+  --color-surface: #121826;
+  --color-border: #1e2738;
+  --color-nav: #0e1420;
+
+  --color-text: #f3f4f6;
+  --color-muted: #9aa4b2;
+
+  --color-accent: #34d399;
+  --color-accent-soft: #0f2a22;
+  --color-accent-border: #1f5e48;
+  --color-accent-contrast: #04160f;
+
+  --color-hero-bg: #0f2a22;
+  --color-hero-border: #1f5e48;
+
+  --color-danger: #f87171;
+  --color-danger-bg: #2a1416;
+  --color-danger-border: #7f2a30;
+  --color-danger-text: #fca5a5;
+
+  --color-warning: #fbbf24;
+  --color-warning-bg: #2a2110;
+  --color-warning-border: #6b4e12;
+  --color-warning-text: #fde68a;
+
+  --radius-card: 16px;
+  --radius-hero: 20px;
+
+  --font-sans: var(--font-inter), Inter, ui-sans-serif, system-ui, -apple-system,
+    BlinkMacSystemFont, "Segoe UI", sans-serif;
+
+  --shadow-card: 0 1px 0 rgba(255, 255, 255, 0.02),
+    0 12px 32px rgba(0, 0, 0, 0.18);
+  --target-marker: #ffffff;
+}
+
+[data-theme="light"] {
+  color-scheme: light;
+
+  --color-bg: #f6f8fb;
+  --color-surface: #ffffff;
+  --color-border: #dde5ef;
+  --color-nav: #ffffff;
+
+  --color-text: #111827;
+  --color-muted: #5b6878;
+
+  /* Green-700 keeps body text and icons AA-compliant on a light surface. */
+  --color-accent: #047857;
+  --color-accent-soft: #d1fae5;
+  --color-accent-border: #6ee7b7;
+  --color-accent-contrast: #ffffff;
+
+  --color-hero-bg: #ecfdf5;
+  --color-hero-border: #a7f3d0;
+
+  --color-danger: #dc2626;
+  --color-danger-bg: #fef2f2;
+  --color-danger-border: #fecaca;
+  --color-danger-text: #991b1b;
+
+  --color-warning: #b45309;
+  --color-warning-bg: #fffbeb;
+  --color-warning-border: #fde68a;
+  --color-warning-text: #92400e;
+
+  --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.04),
+    0 10px 28px rgba(15, 23, 42, 0.06);
+  --target-marker: #111827;
+}
