@@ -81,6 +81,50 @@ const SESSION_REUSE_MARGIN_SECONDS = 30;
 /** One automatic profile fetch per signed-in roll, per page session. */
 const profileFetchAttempts = new Set<string>();
 
+/** One-time changelog for students who used the app before this release. */
+const WHATS_NEW = [
+  "Results is rebuilt: batch rank, SGPA chart, target planner and grade simulator.",
+  "Attendance has its own tab, with a subject-wise calendar.",
+  "Sign-in got a full page, and your IMS photo now shows everywhere.",
+];
+
+function WhatsNew({ roll }: { roll: string }) {
+  const key = `nsutnest_whats_new_v1:${roll}`;
+  const [show, setShow] = useState(false);
+
+  useEffect(() => {
+    try {
+      setShow(!localStorage.getItem(key));
+    } catch {
+      // Private mode without storage: show it, it just cannot remember.
+      setShow(true);
+    }
+  }, [key]);
+
+  if (!show) return null;
+  const dismiss = () => {
+    try {
+      localStorage.setItem(key, new Date().toISOString());
+    } catch {
+      // Nothing to save; the card still closes for this session.
+    }
+    setShow(false);
+  };
+
+  return (
+    <div className="whatsNewLayer" role="dialog" aria-modal="true" aria-labelledby="whatsNewTitle">
+      <div className="whatsNewCard">
+        <small className="whatsNewKicker">What&apos;s new</small>
+        <h2 id="whatsNewTitle">Small upgrades across NsutNest</h2>
+        <ul>
+          {WHATS_NEW.map((item) => <li key={item}>{item}</li>)}
+        </ul>
+        <button type="button" onClick={dismiss}>Got it</button>
+      </div>
+    </div>
+  );
+}
+
 export function ImsLoginGate() {
   const [open, setOpen] = useState(true);
   const [sessionId, setSessionId] = useState("");
@@ -405,6 +449,14 @@ export function ImsLoginGate() {
   /** Saved ID + password: the gate offers the CAPTCHA alone, not the whole form. */
   const savedAccount = !confirmation && savedCredentials && Boolean(roll.trim()) && Boolean(password);
   const printing = signInPurpose === "print";
+  const loginOnly = open && !attendance && !syncing;
+
+  // A fresh device gets the sign-in as the whole page: the dashboard behind it
+  // must not scroll, or the browser paints its own scrollbar over the login.
+  useEffect(() => {
+    document.body.classList.toggle("imsLoginOnly", loginOnly);
+    return () => document.body.classList.remove("imsLoginOnly");
+  }, [loginOnly]);
   const gateIntro = savedAccount
     ? syncing
       ? `Enter the CAPTCHA to ${printing ? "print your IMS profile" : "refresh attendance"} for ${roll.trim()} — your saved ID and password are sent with it.`
@@ -416,6 +468,7 @@ export function ImsLoginGate() {
       : "Sign in with your NSUT IMS account.";
 
   return <>
+    {attendance && !open && <WhatsNew roll={attendance.roll || "ims"} />}
     {attendance && !open && <button className="imsSessionButton" type="button" onClick={() => setOpen(true)} suppressHydrationWarning><Activity size={15} /> {attendance.roll || "IMS connected"}</button>}
     {attendance && open && <div className="imsLoggedInBanner" suppressHydrationWarning><span><b>{attendance.name || attendance.roll}</b> · attendance saved on this device{attendance.syncedAt ? ` · synced ${new Date(attendance.syncedAt).toLocaleString()}` : ""}</span><button type="button" onClick={() => startResync()}><RefreshCw size={14}/> Sync again</button><button type="button" onClick={() => setOpen(false)}>Continue to dashboard</button><button type="button" onClick={logout} aria-label="Log out of IMS"><LogOut size={15}/></button></div>}
     {((open && !attendance) || syncing) && <div className="imsGateBackdrop" role="dialog" aria-modal="true" aria-labelledby="imsGateTitle">

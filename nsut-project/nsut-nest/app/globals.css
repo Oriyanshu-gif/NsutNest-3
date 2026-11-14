@@ -1271,3 +1271,24 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 .imsGateBackdrop .imsGateFoot svg{flex: 0 0 auto; margin-top: 1px; color: #7ee7bd}
 .imsGateBackdrop .imsGateCancel{margin-top: 10px; border-radius: 12px}
 @media (min-width: 900px){ .imsGateBackdrop{place-items: center} }
+
+/* ---- Sign-in is the whole page until the student is in ---- */
+body.imsLoginOnly{overflow:hidden; overscroll-behavior:none}
+.imsGateBackdrop{scrollbar-width:none; -ms-overflow-style:none}
+.imsGateBackdrop::-webkit-scrollbar{display:none}
+.imsGateBackdrop .imsGateCard{padding:18px}
+.imsGateBrand .nsutNestMark{width:48px; height:48px; border-radius:15px}
+.imsGateBrand .nsutNestWordmark b{font-size:1.5rem}
+.imsGateShell{gap:16px}
+.imsCaptchaFigure{width:min(100%, 236px)}
+
+/* ---- One-time "what's new" card ---- */
+.whatsNewLayer{position:fixed; inset:0; z-index:1200; display:flex; align-items:flex-end; justify-content:center; padding:16px calc(16px + env(safe-area-inset-right,0px)) calc(16px + env(safe-area-inset-bottom,0px)); background:rgba(4,8,12,.72); -webkit-backdrop-filter:blur(7px); backdrop-filter:blur(7px)}
+.whatsNewCard{width:min(100%, 420px); padding:18px; border-radius:20px; background:linear-gradient(180deg,#121a22,#0b1015); border:1px solid rgba(45,212,167,.2); box-shadow:0 22px 60px -30px rgba(45,212,167,.4), 0 30px 70px -30px #000; color:#e8eef4}
+.whatsNewKicker{display:block; font-size:0.625rem; letter-spacing:.16em; text-transform:uppercase; color:#7ee7bd; font-weight:700}
+.whatsNewCard h2{margin:6px 0 12px; font:600 1.0625rem 'Sora', sans-serif; letter-spacing:-.02em; color:#f2f6f9}
+.whatsNewCard ul{list-style:none; margin:0 0 16px; padding:0; display:flex; flex-direction:column; gap:9px}
+.whatsNewCard li{position:relative; padding-left:16px; font-size:0.75rem; line-height:1.5; color:#96a7b4}
+.whatsNewCard li::before{content:""; position:absolute; left:2px; top:7px; width:5px; height:5px; border-radius:50%; background:var(--green)}
+.whatsNewCard button{width:100%; padding:13px; border:0; border-radius:13px; background:linear-gradient(180deg,#93f0cb,#2dd4a7); color:#04241b; font-size:0.8125rem; font-weight:700; cursor:pointer}
+@media (min-width: 641px){ .whatsNewLayer{align-items:center} }
