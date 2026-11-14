@@ -461,24 +461,25 @@ export function ImsLoginGate() {
               <button type="button" onClick={useDifferentAccount} disabled={loading || captchaLoading}>Use a different account</button>
             </div>
           ) : <>
-            <label>Roll number<input ref={rollRef} name="username" autoComplete="username" enterKeyHint="next" value={roll} onChange={e => updateRoll(e.target.value)} required placeholder="2025UME4077" /></label>
+            <label>Roll number<input ref={rollRef} name="username" autoComplete="username" enterKeyHint="next" value={roll} onChange={e => updateRoll(e.target.value)} required placeholder="Enter your roll number" /></label>
             <label>Password<span className="imsPasswordWrap"><input name="password" autoComplete="current-password" type={showPassword ? "text" : "password"} value={password} onChange={e => updatePassword(e.target.value)} required placeholder="Your portal password" /><button type="button" onClick={() => setShowPassword(v => !v)} aria-label={showPassword ? "Hide password" : "Show password"}>{showPassword ? <EyeOff size={17}/> : <Eye size={17}/>}</button></span></label>
             <label className="imsRememberRow imsRememberCredentials">
               <input type="checkbox" checked={rememberCredentials} onChange={event => updateRememberCredentials(event.target.checked)} />
-              <span><b>Remember my IMS ID and password on this device</b><small>Plain text in this browser. Avoid on shared devices; logging out erases them.</small></span>
+              <span><b>Remember my IMS ID and password on this device</b><small>Saved in this browser; logging out erases them.</small></span>
             </label>
           </>}
           {captchaRequired && <>
-            <div className="imsCaptchaHead"><label htmlFor="imsCaptchaInput">Captcha from the portal</label></div>
-            <div className="imsCaptchaRow">
+            <div className="imsCaptchaHead"><label htmlFor="imsCaptchaInput">Captcha from the portal</label>
+              <button className="imsCaptchaLink" type="button" onClick={() => void newCaptcha()} disabled={captchaLoading || loading}><RefreshCw size={12}/> New code</button>
+            </div>
+            <div className="imsCaptchaFigure">
               {captcha
                 ? <img className="imsCaptchaImage" src={captcha} alt="CAPTCHA supplied by NSUT IMS" />
                 : <div className="imsCaptchaPlaceholder">{captchaLoading
                     ? <><Loader2 className="imsSpin" size={17}/> Loading CAPTCHA…</>
                     : <><span>CAPTCHA unavailable</span><button type="button" onClick={() => void newCaptcha()} disabled={loading}>Try again</button></>}</div>}
-              <button className="imsCaptchaRefresh" type="button" onClick={() => void newCaptcha()} disabled={captchaLoading || loading} aria-label="Load a new CAPTCHA image"><RefreshCw size={16}/></button>
             </div>
-            <input id="imsCaptchaInput" ref={captchaRef} value={captchaText} onChange={e => setCaptchaText(e.target.value)} required placeholder="Type the characters you see" autoComplete="off" autoCapitalize="off" autoCorrect="off" spellCheck={false} enterKeyHint="go" aria-describedby="imsCaptchaHint" />
+            <input id="imsCaptchaInput" className="imsCaptchaInput" ref={captchaRef} value={captchaText} onChange={e => setCaptchaText(e.target.value)} required placeholder="Type the characters you see" autoComplete="off" autoCapitalize="off" autoCorrect="off" spellCheck={false} enterKeyHint="go" aria-describedby="imsCaptchaHint" />
             <small className="imsCaptchaHint" id="imsCaptchaHint">Wrong code? Only the image reloads — your details stay.</small>
           </>}
         </>}
