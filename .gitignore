@@ -9,7 +9,3 @@ next-env.d.ts
 .attendance-check
 .ims-check
 .profile-check
-.timetable-check
-
-# local dev logs
-*.log

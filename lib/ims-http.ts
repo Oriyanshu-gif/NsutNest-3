@@ -16,8 +16,6 @@ export type ImsHttpSession = {
   navigationUrls?: string[];
   /** Authenticated My Profile link, captured at login for the profile route. */
   profileUrl?: string;
-  /** Authenticated My Activities link, captured at login for timetable discovery. */
-  activitiesUrl?: string;
   studentRoll?: string;
   academicYearValue?: string;
   semesterValue?: string;

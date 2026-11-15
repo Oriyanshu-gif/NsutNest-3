@@ -11,8 +11,6 @@ export const ATTENDANCE_STORAGE_KEY = "nsutnest_ims_attendance";
 export const ATTENDANCE_SYNC_EVENT = "nsutnest-ims-attendance";
 export const PROFILE_STORAGE_KEY = "nsutnest_ims_profile";
 export const PROFILE_SYNC_EVENT = "nsutnest-ims-profile";
-export const TIMETABLE_STORAGE_KEY = "nsutnest_ims_timetable";
-export const TIMETABLE_SYNC_EVENT = "nsutnest-ims-timetable";
 export const ATTENDANCE_REFRESH_EVENT = "nsutnest-ims-refresh-request";
 export const ATTENDANCE_REFRESH_STATUS_EVENT = "nsutnest-ims-refresh-status";
 export const REMEMBERED_IMS_ROLL_KEY = "nsutnest_ims_roll";
@@ -69,52 +67,6 @@ export function writeStoredAttendance(value: string): void {
   store("local")?.setItem(ATTENDANCE_STORAGE_KEY, value);
   // Never leave a second, tab-scoped copy behind.
   store("session")?.removeItem(ATTENDANCE_STORAGE_KEY);
-  recordAttendancePoint(value);
-}
-
-/**
- * One attendance percentage per day, so the results tab can draw the trend the
- * student is actually making. IMS reports only today's snapshot, so the history
- * starts the day the app is first used and never back-fills.
- */
-export type AttendancePoint = { roll: string; date: string; percent: number };
-export const ATTENDANCE_HISTORY_KEY = "nsutnest_ims_attendance_history";
-const HISTORY_LIMIT = 60;
-
-function recordAttendancePoint(payload: string): void {
-  try {
-    const parsed = JSON.parse(payload) as { roll?: string; subjects?: { held?: number; present?: number }[] };
-    let held = 0;
-    let present = 0;
-    for (const subject of parsed.subjects ?? []) {
-      held += subject.held ?? 0;
-      present += subject.present ?? 0;
-    }
-    if (!parsed.roll || !held) return;
-    const local = store("local");
-    if (!local) return;
-    const point: AttendancePoint = {
-      roll: parsed.roll,
-      date: new Date().toISOString().slice(0, 10),
-      percent: Math.round((present / held) * 1000) / 10,
-    };
-    const kept = readAttendanceHistory().filter(
-      (item) => item.roll === point.roll && item.date !== point.date,
-    );
-    local.setItem(ATTENDANCE_HISTORY_KEY, JSON.stringify([...kept, point].slice(-HISTORY_LIMIT)));
-  } catch {
-    // A history that cannot be written must not block the attendance itself.
-  }
-}
-
-export function readAttendanceHistory(): AttendancePoint[] {
-  try {
-    const raw = store("local")?.getItem(ATTENDANCE_HISTORY_KEY);
-    const parsed = raw ? (JSON.parse(raw) as AttendancePoint[]) : [];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
 }
 
 export function clearStoredAttendance(): void {
@@ -123,7 +75,6 @@ export function clearStoredAttendance(): void {
     target?.removeItem(ATTENDANCE_STORAGE_KEY);
     target?.removeItem(LEGACY_ATTENDANCE_STORAGE_KEY);
   }
-  store("local")?.removeItem(ATTENDANCE_HISTORY_KEY);
 }
 
 /** Tells every mounted page that the stored attendance changed. */
@@ -144,16 +95,6 @@ export type StoredImsProfile = {
   fields: { label: string; value: string }[];
   fetchedAt: string;
 };
-
-/** The saved IMS photograph (a data URL), or null when none is stored. */
-export function readStoredPhoto(): string | null {
-  try {
-    const raw = readStoredProfile();
-    return raw ? ((JSON.parse(raw) as { photo?: string | null }).photo ?? null) : null;
-  } catch {
-    return null;
-  }
-}
 
 export function readStoredProfile(): string | null {
   try {
@@ -177,39 +118,6 @@ export function clearStoredProfile(): void {
   } catch {
     // Nothing stored means nothing to clear.
   }
-}
-
-/**
- * The timetable is public to this browser only: it is fetched with the IMS
- * session cookie on the server and cached here so the dashboard works offline
- * and does not crawl the portal on every visit.
- */
-export function readStoredTimetable(): string | null {
-  try {
-    return store("local")?.getItem(TIMETABLE_STORAGE_KEY) ?? null;
-  } catch {
-    return null;
-  }
-}
-
-export function writeStoredTimetable(value: string): void {
-  try {
-    store("local")?.setItem(TIMETABLE_STORAGE_KEY, value);
-  } catch {
-    // A full quota keeps the live timetable on screen for this visit.
-  }
-}
-
-export function clearStoredTimetable(): void {
-  try {
-    store("local")?.removeItem(TIMETABLE_STORAGE_KEY);
-  } catch {
-    // Nothing stored means nothing to clear.
-  }
-}
-
-export function notifyTimetableSync(): void {
-  if (typeof window !== "undefined") window.dispatchEvent(new Event(TIMETABLE_SYNC_EVENT));
 }
 
 /** Tells the sidebar and profile page that the cached profile changed. */

@@ -31,17 +31,6 @@ function isStandalone(): boolean {
 export function RegisterServiceWorker() {
   useEffect(() => {
     if (!("serviceWorker" in navigator)) return;
-    // A precached worker during `next dev` serves yesterday's HTML and JS after
-    // a rebuild, which looks like a hydration failure. Production still gets the
-    // installable offline worker; development always talks to the dev server.
-    if (process.env.NODE_ENV !== "production") {
-      navigator.serviceWorker.getRegistrations()
-        .then((registrations) => Promise.all(registrations.map((registration) => registration.unregister())))
-        .catch(() => {
-          // A browser without service-worker support simply keeps using the network.
-        });
-      return;
-    }
     const register = () => {
       navigator.serviceWorker.register("/sw.js").catch((error) => {
         console.error("NSUT Nest service worker registration failed:", error);

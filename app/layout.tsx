@@ -1,8 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Inter } from "next/font/google";
-import "./styles/tokens.css";
 import "./globals.css";
-import "./nest-paper.css";
 import { ImsLoginGate } from "./hub-shell";
 import { RegisterServiceWorker } from "./install-pwa";
 
@@ -10,7 +7,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  themeColor: "#0B0F17",
+  themeColor: "#0b0e12",
 };
 
 export const metadata: Metadata = {
@@ -28,38 +25,10 @@ export const metadata: Metadata = {
   },
 };
 
-const inter = Inter({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-  variable: "--font-inter",
-  display: "swap",
-});
-
-/**
- * Run before the first paint so a saved light theme or Hinglish locale never
- * flashes the defaults. They must be inline: React has not hydrated yet.
- */
-const themeBootScript = `(function(){try{var t=window.localStorage.getItem("nsutnest-theme");if(t==="dark"||t==="light"){document.documentElement.setAttribute("data-theme",t);document.documentElement.style.colorScheme=t;}}catch(e){}})();`;
-
-const languageBootScript = `(function(){try{var l=window.localStorage.getItem("nsutnest-language");if(l==="hinglish"){document.documentElement.lang="hi-Latn";}}catch(e){}})();`;
-
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html
-      lang="en-IN"
-      data-theme="dark"
-      className={inter.variable}
-      suppressHydrationWarning
-    >
+    <html lang="en" suppressHydrationWarning>
       <body suppressHydrationWarning>
-        <script
-          dangerouslySetInnerHTML={{ __html: themeBootScript }}
-          suppressHydrationWarning
-        />
-        <script
-          dangerouslySetInnerHTML={{ __html: languageBootScript }}
-          suppressHydrationWarning
-        />
         {children}
         <ImsLoginGate />
         <RegisterServiceWorker />
