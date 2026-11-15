@@ -1,1 +1,12 @@
-[{"relation":["delegate_permission/common.handle_all_urls"],"target":{"namespace":"android_app","package_name":"REPLACE_WITH_PACKAGE_NAME","sha256_cert_fingerprints":["REPLACE_WITH_SHA256_FINGERPRINT"]}}]
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "xyz.nsutnest.app",
+      "sha256_cert_fingerprints": [
+        "21:97:B6:CC:87:4A:A5:58:A9:6A:FA:95:0D:DE:1A:4F:D5:EB:45:9A:BE:91:D2:F1:E2:4A:04:04:A7:50:A6:DB"
+      ]
+    }
+  }
+]
