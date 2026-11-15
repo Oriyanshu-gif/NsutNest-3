@@ -9,6 +9,7 @@
  * the page asks the IMS gate for a refresh, exactly like the attendance button.
  */
 
+import { apiUrl } from "../lib/api-base";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -194,7 +195,7 @@ export default function HubShell({ children }: { children: ReactNode }) {
     if (profileFetchAttempts.has(key)) return;
     profileFetchAttempts.add(key);
 
-    fetch("/api/ims/profile", { cache: "no-store" })
+    fetch(apiUrl("/api/ims/profile"), { cache: "no-store" })
       .then(async (response) => {
         const body = (await response.json()) as StoredImsProfile & { error?: string };
         if (!response.ok) throw new Error(body.error || "Profile unavailable");
@@ -311,7 +312,7 @@ export default function HubShell({ children }: { children: ReactNode }) {
   useEffect(() => {
     const ping = () => {
       if (document.visibilityState === "visible") {
-        void fetch("/api/ims/keepalive", { method: "POST", cache: "no-store" }).catch(() => {});
+        void fetch(apiUrl("/api/ims/keepalive"), { method: "POST", cache: "no-store" }).catch(() => {});
       }
     };
     ping();
