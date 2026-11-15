@@ -13,7 +13,8 @@ export function middleware(request: NextRequest) {
   const cors = {
     "Access-Control-Allow-Origin": APP_ORIGIN,
     "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Allow-Headers": "Content-Type, x-ims-session",
+    "Access-Control-Expose-Headers": "x-ims-session",
     "Access-Control-Max-Age": "600",
   };
 

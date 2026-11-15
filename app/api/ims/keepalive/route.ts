@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
-  encodeImsSession,
-  IMS_COOKIE_NAME,
-  imsCookieOptions,
   readImsSession,
   requestIms,
+  clearImsSession,
+  readImsSessionFrom,
+  setImsSession,
 } from '../../../../lib/ims-http';
 
 export const runtime = 'nodejs';
@@ -20,7 +20,7 @@ export const dynamic = 'force-dynamic';
  * involved: this only reuses the session the student created themselves.
  */
 export async function POST(request: NextRequest) {
-  const session = readImsSession(request.cookies.get(IMS_COOKIE_NAME)?.value);
+  const session = readImsSessionFrom(request);
   const page = session?.profileUrl ?? session?.navigationUrls?.[0];
   if (!session || session.stage !== 'attendance' || !page) {
     return NextResponse.json({ ok: false, needsLogin: true }, { status: 401, headers: { 'Cache-Control': 'no-store' } });
@@ -31,11 +31,11 @@ export async function POST(request: NextRequest) {
     // IMS answers a dead session with its own password form.
     if (/<input[^>]+type=["']?password/i.test(response.html)) throw new Error('signed out');
     const renewed = NextResponse.json({ ok: true }, { headers: { 'Cache-Control': 'no-store' } });
-    renewed.cookies.set(IMS_COOKIE_NAME, encodeImsSession(session), imsCookieOptions());
+    setImsSession(renewed, session);
     return renewed;
   } catch {
     const expired = NextResponse.json({ ok: false, needsLogin: true }, { status: 401, headers: { 'Cache-Control': 'no-store' } });
-    expired.cookies.set(IMS_COOKIE_NAME, '', { ...imsCookieOptions(), maxAge: 0 });
+    clearImsSession(expired);
     return expired;
   }
 }

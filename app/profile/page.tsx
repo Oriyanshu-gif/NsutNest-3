@@ -1,5 +1,6 @@
 "use client";
 
+import { imsFetch } from "../../lib/ims-client";
 /**
  * My Profile — the read-only IMS student profile, fetched with the same
  * authenticated session as attendance.
@@ -83,7 +84,7 @@ function MyProfileBody() {
     setLoading(true);
     setError("");
 
-    fetch(apiUrl("/api/ims/profile"), { cache: "no-store" })
+    imsFetch("/api/ims/profile", { cache: "no-store" })
       .then(async response => {
         const body = await response.json() as StoredImsProfile & { error?: string };
         if (!response.ok) throw new Error(body.error || "Could not load your IMS profile.");
@@ -163,7 +164,7 @@ function MyProfileBody() {
     // fires its print again.
     setPrintHtml("");
     try {
-      const response = await fetch(apiUrl("/api/ims/profile/print"), { cache: "no-store" });
+      const response = await imsFetch("/api/ims/profile/print", { cache: "no-store" });
       if (response.status === 401) {
         printAttemptsRef.current += 1;
         if (printAttemptsRef.current > 2) {

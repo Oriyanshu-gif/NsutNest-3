@@ -1,5 +1,6 @@
 "use client";
 
+import { imsFetch } from "../../lib/ims-client";
 import { apiUrl } from "../../lib/api-base";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -156,7 +157,7 @@ function TimetableBody() {
     setError("");
     setLoading(true);
 
-    fetch(apiUrl("/api/ims/timetable"), { cache: "no-store" })
+    imsFetch("/api/ims/timetable", { cache: "no-store" })
       .then(async (response) => {
         const body = (await response.json().catch(() => ({}))) as TimetablePayload & { error?: string };
         if (!response.ok) throw new Error(body.error || "Could not load your IMS timetable.");

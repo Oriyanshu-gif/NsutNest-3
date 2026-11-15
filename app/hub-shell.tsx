@@ -1,5 +1,6 @@
 "use client";
 
+import { forgetImsToken, imsFetch } from "../lib/ims-client";
 /**
  * Shared shell for the NsutNest dashboard: fixed left sidebar and the top bar
  * with breadcrumb, notification bell and semester chip. The main content area
@@ -166,7 +167,7 @@ export function ImsLoginGate() {
   async function newCaptcha(preserveError = false) {
     setCaptchaLoading(true); if (!preserveError) setError(""); setCaptchaText("");
     try {
-      const res = await fetch(apiUrl("/api/ims/session"), { method: "POST", cache: "no-store" });
+      const res = await imsFetch("/api/ims/session", { method: "POST", cache: "no-store" });
       const body = await res.json();
       if (!res.ok) throw new Error(body.error || "Could not start an IMS login session.");
       setSessionId(body.sessionId);
@@ -280,7 +281,7 @@ export function ImsLoginGate() {
     let failureMessage = "Could not load attendance right now. Please try again.";
     try {
       const isConfirming = confirmation !== null;
-      const res = await fetch(apiUrl("/api/ims/attendance"), {
+      const res = await imsFetch("/api/ims/attendance", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         cache: "no-store",
@@ -331,6 +332,7 @@ export function ImsLoginGate() {
 
   function logout() {
     clearStoredAttendance();
+    forgetImsToken();
     // Logging out is the "forget me" action: saved credentials and the cached
     // IMS photograph go too.
     clearRememberedImsId();
@@ -361,7 +363,7 @@ export function ImsLoginGate() {
     let failure = "";
     window.dispatchEvent(new CustomEvent(ATTENDANCE_REFRESH_STATUS_EVENT, { detail: true }));
     try {
-      const res = await fetch(apiUrl("/api/ims/refresh"), { method: "POST", cache: "no-store" });
+      const res = await imsFetch("/api/ims/refresh", { method: "POST", cache: "no-store" });
       const body = (await res.json().catch(() => ({}))) as RefreshApiResponse;
       if (res.ok && Array.isArray(body.subjects) && body.subjects.length) {
         const payload = { ...body, subjects: withResolvedSubjectNames(body.subjects) } as LiveAttendance;

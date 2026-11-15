@@ -9,6 +9,8 @@ import { existsSync, renameSync } from "node:fs";
 const parked = [
   ["app/api", ".holdout-api"],
   ["app/notices/[id]", ".holdout-notice"],
+  // Next rejects middleware in an export; the app needs none of it.
+  ["middleware.ts", ".holdout-middleware.ts"],
 ];
 
 const restore = () => {
