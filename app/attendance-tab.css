@@ -1,0 +1,43 @@
+/* ---- Attendance tab: gauge, subject breakdown, expandable calendar ---- */
+.attSummary { border: 1px solid #22303c; border-radius: 16px; background: linear-gradient(180deg, #16211c, #131a22 70%); padding: 16px; }
+.attSummaryHead { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.attSummaryHead span { display: block; font-size: 0.625rem; letter-spacing: .08em; text-transform: uppercase; color: #8493a1; }
+.attSummaryHead h2 { margin: 4px 0 0; font: 600 1.0625rem 'Sora', sans-serif; letter-spacing: -.02em; color: #eef3f7; }
+.attDelta { font-size: 0.6875rem; font-weight: 600; border-radius: 999px; padding: 4px 9px; white-space: nowrap; }
+.attDelta.up { color: #8de06a; background: #172619; border: 1px solid #2b4430; }
+.attDelta.down { color: #f2705f; background: #241618; border: 1px solid #4a2a2a; }
+.attSummaryBody { display: flex; align-items: center; gap: 16px; margin-top: 14px; }
+.attStats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 0; flex: 1; }
+.attStats div { border: 1px solid #22303c; border-radius: 12px; background: #0f151c; padding: 10px 12px; }
+.attStats dt { font-size: 0.625rem; color: #8493a1; }
+.attStats dd { margin: 3px 0 0; font: 600 1.125rem 'Sora', sans-serif; font-variant-numeric: tabular-nums; color: #eef3f7; }
+.attSectionHead { align-items: flex-end; }
+.attCount { display: inline-block; margin-left: 8px; font-size: 0.6875rem; color: #8493a1; background: #182029; border-radius: 999px; padding: 2px 8px; vertical-align: middle; }
+.attSort { font-size: 0.6875rem; font-weight: 600; color: #b7e78f; background: #16211c; border: 1px solid #2b4430; border-radius: 999px; padding: 7px 12px; cursor: pointer; }
+.attSort:hover { background: #1b2a22; }
+.attList { display: flex; flex-direction: column; gap: 10px; }
+.attSubject { border: 1px solid #22303c; border-radius: 16px; background: #131a22; overflow: hidden; }
+.attSubject.isOpen { border-color: #33454f; }
+.attSubjectHead { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; grid-template-areas: "title pct chev" "meta meta meta" "note note note"; gap: 5px 10px; width: 100%; text-align: left; background: none; border: 0; padding: 14px 16px; color: inherit; cursor: pointer; font: inherit; }
+.attSubjectTitle { grid-area: title; display: flex; align-items: center; gap: 8px; min-width: 0; }
+.attSubjectTitle b { font: 600 1rem/1.35 'Sora', sans-serif; letter-spacing: -.02em; color: #eef3f7; }
+.attCode { font-size: 0.5938rem; color: #8493a1; border: 1px solid #2a3742; border-radius: 5px; padding: 1px 5px; white-space: nowrap; }
+.attSubjectHead strong { grid-area: pct; font: 600 1.0625rem 'Sora', sans-serif; font-variant-numeric: tabular-nums; }
+.attSubjectHead strong.risk { color: #f2705f; }
+.attSubjectHead strong.borderline { color: #f0b429; }
+.attSubjectHead strong.safe { color: #8de06a; }
+.attSubjectHead strong.none { color: #8493a1; }
+.attChev { grid-area: chev; align-self: center; color: #7d8b98; transition: transform .2s ease; }
+.attSubject.isOpen .attChev { transform: rotate(90deg); }
+.attSubjectMeta { grid-area: meta; color: #8493a1; font-size: 0.75rem; }
+.attSubjectNote { grid-area: note; display: flex; align-items: center; gap: 6px; color: #8b98a5; font-size: 0.75rem; line-height: 1.4; }
+.attSubjectNote em { font-style: normal; font-weight: 600; }
+.attSubjectNote em.risk { color: #f2705f; }
+.attSubjectNote em.borderline { color: #f0b429; }
+.attSubjectNote em.safe { color: #8de06a; }
+.attDot { width: 7px; height: 7px; border-radius: 2px; flex: 0 0 auto; }
+.attDot.risk { background: #e2604d; }
+.attDot.borderline { background: #e6a72c; }
+.attDot.safe { background: #7fcf4b; }
+.attDot.none { background: #2c3945; }
+.attCalendarWrap { border-top: 1px solid #22303c; padding: 12px; }
