@@ -125,7 +125,6 @@ async function navigateAfterLogin(session: ImsHttpSession, loginResponse: ImsHtt
   rememberProfileLink(session, [{ url: loginResponse.url, html: loginResponse.html }, ...pages]);
   const activities = findLink(pages, /^My Activities$/i);
   if (!activities) throw new Error('Login succeeded, but the IMS My Activities link was not found in its returned pages.');
-  session.activitiesUrl = activities.url;
 
   const activitiesPage = await requestIms(session, activities.url, { referer: activities.page.url });
   // Fast path: My Attendance link is often directly on activitiesPage without needing to crawl its subframes
