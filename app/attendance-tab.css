@@ -1,0 +1,47 @@
+/* ---- Attendance tab: gauge, subject breakdown ---- */
+/* Type here is deliberately one step smaller than the dashboard: this screen is
+   a dense list students scan on a phone. */
+.attPage .nestHead h1 { font-size: clamp(1.25rem, 3.6vw, 1.5rem); }
+.attPage .nestHead p { font-size: 0.8125rem; }
+.attSummary { border: 1px solid var(--paper-line); border-radius: 16px; background: linear-gradient(180deg, var(--paper-lime-soft), var(--paper-surface) 70%); padding: 14px; }
+.attSummaryHead { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.attSummaryHead span { display: block; font-size: 0.5625rem; letter-spacing: .08em; text-transform: uppercase; color: var(--paper-muted); }
+.attSummaryHead h2 { margin: 3px 0 0; font: 600 1rem var(--font-display), sans-serif; letter-spacing: -.02em; color: var(--paper-text); }
+.attDelta { font-size: 0.625rem; font-weight: 600; border-radius: 999px; padding: 3px 8px; white-space: nowrap; }
+.attDelta.up { color: var(--paper-safe); background: var(--paper-lime-soft); border: 1px solid var(--paper-line); }
+.attDelta.down { color: var(--paper-rust); background: var(--paper-rust-soft); border: 1px solid var(--paper-line); }
+.attSummaryBody { display: flex; align-items: center; gap: 14px; margin-top: 12px; }
+.attStats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; margin: 0; flex: 1; }
+.attStats div { border: 1px solid var(--paper-line); border-radius: 11px; background: var(--paper-sunk); padding: 8px 10px; }
+.attStats dt { font-size: 0.5625rem; letter-spacing: .04em; text-transform: uppercase; color: var(--paper-muted); }
+.attStats dd { margin: 2px 0 0; font: 600 0.9375rem var(--font-display), sans-serif; font-variant-numeric: tabular-nums; color: var(--paper-text); }
+.attSectionHead { align-items: flex-end; }
+.attCount { display: inline-block; margin-left: 7px; font-size: 0.625rem; color: var(--paper-muted); background: var(--paper-surface); border: 1px solid var(--paper-line); border-radius: 999px; padding: 1px 7px; vertical-align: middle; }
+.attSort { font-size: 0.625rem; font-weight: 600; color: var(--paper-lime-ink); background: var(--paper-lime-soft); border: 1px solid var(--paper-line); border-radius: 999px; padding: 6px 10px; cursor: pointer; }
+.attSort:hover { border-color: var(--paper-line-strong); }
+.attList { display: flex; flex-direction: column; gap: 8px; }
+.attSubject { border: 1px solid var(--paper-line); border-radius: 14px; background: var(--paper-surface); overflow: hidden; }
+.attSubject.isOpen { border-color: var(--paper-line-strong); }
+.attSubjectHead { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; grid-template-areas: "title pct chev" "meta meta meta" "note note note"; gap: 3px 10px; width: 100%; text-align: left; background: none; border: 0; padding: 11px 13px; color: inherit; cursor: pointer; font: inherit; }
+.attSubjectTitle { grid-area: title; display: flex; align-items: center; gap: 7px; min-width: 0; }
+.attSubjectTitle b { font: 600 0.875rem/1.35 var(--font-display), sans-serif; letter-spacing: -.01em; color: var(--paper-text); }
+.attCode { font-size: 0.5625rem; color: var(--paper-muted); border: 1px solid var(--paper-line); border-radius: 5px; padding: 0 4px; white-space: nowrap; }
+.attSubjectHead strong { grid-area: pct; font: 600 0.9375rem var(--font-display), sans-serif; font-variant-numeric: tabular-nums; }
+.attSubjectHead strong.risk { color: var(--paper-rust); }
+.attSubjectHead strong.borderline { color: var(--paper-amber); }
+.attSubjectHead strong.safe { color: var(--paper-safe); }
+.attSubjectHead strong.none { color: var(--paper-muted); }
+.attChev { grid-area: chev; align-self: center; color: var(--paper-muted); transition: transform .2s ease; }
+.attSubject.isOpen .attChev { transform: rotate(90deg); }
+.attSubjectMeta { grid-area: meta; color: var(--paper-muted); font-size: 0.6875rem; }
+.attSubjectNote { grid-area: note; display: flex; align-items: center; gap: 5px; color: var(--paper-muted); font-size: 0.6875rem; line-height: 1.4; }
+.attSubjectNote em { font-style: normal; font-weight: 600; }
+.attSubjectNote em.risk { color: var(--paper-rust); }
+.attSubjectNote em.borderline { color: var(--paper-amber); }
+.attSubjectNote em.safe { color: var(--paper-safe); }
+.attDot { width: 6px; height: 6px; border-radius: 2px; flex: 0 0 auto; }
+.attDot.risk { background: var(--paper-rust); }
+.attDot.borderline { background: var(--paper-amber); }
+.attDot.safe { background: var(--paper-safe); }
+.attDot.none { background: var(--paper-line); }
+.attCalendarWrap { border-top: 1px solid var(--paper-line); padding: 12px; }

@@ -1,8 +1,15 @@
 import { randomUUID } from 'node:crypto';
 import { load } from 'cheerio';
+import type { NextRequest, NextResponse } from 'next/server';
 
 export const IMS_BASE_URL = 'https://www.imsnsit.org/imsnsit/';
 export const IMS_COOKIE_NAME = 'nsutnest_ims';
+/**
+ * The same session token, for callers that cannot hold a cross-site cookie: the
+ * bundled Android app serves its pages from https://localhost, so a
+ * SameSite cookie is never sent on its way back to this server.
+ */
+export const IMS_TOKEN_HEADER = 'x-ims-session';
 export const IMS_SESSION_SECONDS = 180;
 
 export type ImsHttpSession = {
@@ -16,6 +23,8 @@ export type ImsHttpSession = {
   navigationUrls?: string[];
   /** Authenticated My Profile link, captured at login for the profile route. */
   profileUrl?: string;
+  /** Authenticated My Activities link, captured at login for timetable discovery. */
+  activitiesUrl?: string;
   studentRoll?: string;
   academicYearValue?: string;
   semesterValue?: string;
@@ -35,6 +44,26 @@ function decodeCookie(value: string): ImsHttpSession | null {
 
 export function readImsSession(value?: string): ImsHttpSession | null {
   return value ? decodeCookie(value) : null;
+}
+
+/** Cookie on the web, header from the app; both carry the same token. */
+export function readImsSessionFrom(request: NextRequest): ImsHttpSession | null {
+  return readImsSession(
+    request.cookies.get(IMS_COOKIE_NAME)?.value ?? request.headers.get(IMS_TOKEN_HEADER) ?? undefined,
+  );
+}
+
+export function setImsSession<T extends NextResponse>(response: T, session: ImsHttpSession): T {
+  const value = encodeImsSession(session);
+  response.cookies.set(IMS_COOKIE_NAME, value, imsCookieOptions());
+  response.headers.set(IMS_TOKEN_HEADER, value);
+  return response;
+}
+
+export function clearImsSession<T extends NextResponse>(response: T): T {
+  response.cookies.set(IMS_COOKIE_NAME, '', { ...imsCookieOptions(), maxAge: 0 });
+  response.headers.set(IMS_TOKEN_HEADER, '');
+  return response;
 }
 
 export function encodeImsSession(session: ImsHttpSession): string {
