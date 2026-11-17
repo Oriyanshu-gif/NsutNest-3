@@ -1,0 +1,39 @@
+/* ---- TNP placement dataset ---- */
+.tnpSync{font-size:0.6875rem; font-weight:600; color:var(--green); background:var(--green-soft); border:1px solid var(--green-line); border-radius:999px; padding:5px 11px; white-space:nowrap}
+.tnpOpportunities{margin-bottom:16px}
+.tnpOpportunityHead{display:flex; align-items:flex-start; justify-content:space-between; gap:16px; margin-bottom:14px}
+.tnpOpportunityHead h2{font:600 1.25rem var(--font-display),sans-serif; letter-spacing:-.02em; margin:6px 0 4px}
+.tnpOpportunityHead p{color:var(--muted); font-size:0.8125rem; line-height:1.55; margin:0; max-width:60ch}
+.tnpResultCount{font-size:0.6875rem; color:var(--muted); border:1px solid var(--border); border-radius:999px; padding:4px 10px; white-space:nowrap}
+.tnpFilters{display:grid; grid-template-columns:minmax(0,1fr) auto auto; gap:9px; margin-bottom:14px}
+.tnpSearch{display:flex; align-items:center; gap:8px; padding:0 12px; border:1px solid var(--border); border-radius:10px; background:var(--bg); color:var(--muted)}
+.tnpSearch input{flex:1; min-width:0; border:0; background:transparent; color:var(--text); font:inherit; font-size:0.8125rem; padding:10px 0; outline:none}
+.tnpSelectLabel{display:flex; align-items:center; gap:7px; padding:0 10px; border:1px solid var(--border); border-radius:10px; background:var(--bg); color:var(--muted)}
+.tnpSelectLabel select{border:0; background:transparent; color:var(--text); font:inherit; font-size:0.75rem; padding:10px 0; outline:none; cursor:pointer}
+.tnpSearch:focus-within,.tnpSelectLabel:focus-within{border-color:var(--green-line)}
+.tnpLoadError{padding:10px 12px; border:1px solid var(--border); border-radius:10px; background:var(--green-soft); color:var(--muted); font-size:0.75rem; line-height:1.5}
+.tnpNoResults{padding:22px 12px; text-align:center; color:var(--muted); font-size:0.8125rem}
+.tnpOpportunityList{display:flex; flex-direction:column; gap:8px}
+.tnpOpportunity{display:flex; align-items:flex-start; justify-content:space-between; gap:16px; padding:12px 14px; border:1px solid var(--border); border-radius:12px; background:var(--bg); transition:border-color .15s}
+.tnpOpportunity:hover{border-color:var(--green-line)}
+.tnpOpportunityMain{min-width:0}
+.tnpCompanyLine{display:flex; align-items:center; gap:8px; flex-wrap:wrap}
+.tnpCompanyLine h3{font:600 0.9375rem var(--font-display),sans-serif; letter-spacing:-.01em; margin:0}
+.tnpType{font-size:0.5625rem; font-weight:700; letter-spacing:.06em; text-transform:uppercase; border:1px solid var(--border); border-radius:5px; padding:1px 6px; color:var(--muted)}
+.tnpType.placement{color:var(--green); border-color:var(--green-line); background:var(--green-soft)}
+.tnpType.internship{border-color:var(--border); background:var(--panel); color:var(--muted)}
+.tnpRole{margin:3px 0 6px; font-size:0.8125rem; color:var(--text)}
+.tnpMeta{display:flex; flex-wrap:wrap; gap:4px 14px; font-size:0.6875rem; color:var(--muted)}
+.tnpMeta span{display:inline-flex; align-items:center; gap:5px; min-width:0}
+.tnpBranches{margin:7px 0 0; font-size:0.6875rem; line-height:1.5; color:var(--muted)}
+.tnpBranches b{color:var(--text); font-weight:600}
+.tnpStipendInfo{margin:4px 0 0; font-size:0.6563rem; color:var(--muted)}
+.tnpPay{flex:0 0 auto; text-align:right}
+.tnpPay small{display:block; font-size:0.5625rem; letter-spacing:.05em; text-transform:uppercase; color:var(--muted)}
+.tnpPay b{display:block; margin-top:3px; font:600 0.9375rem var(--font-display),sans-serif; font-variant-numeric:tabular-nums; color:var(--green)}
+.tnpLimitNote,.tnpDatasetNote{margin:12px 0 0; font-size:0.6563rem; line-height:1.55; color:var(--muted)}
+@media(max-width:720px){
+  .tnpFilters{grid-template-columns:1fr}
+  .tnpOpportunity{flex-direction:column; gap:8px}
+  .tnpPay{text-align:left}
+}

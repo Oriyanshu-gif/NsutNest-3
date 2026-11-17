@@ -12,7 +12,7 @@ import { imsFetch } from "../lib/ims-client";
  */
 
 import { apiUrl } from "../lib/api-base";
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   Activity,
@@ -55,7 +55,7 @@ import { downloadExamCalendar } from "../lib/exam-calendar";
 import type { TimetableEntry, TimetablePayload } from "../lib/ims-timetable";
 import { withResolvedSubjectNames } from "../lib/attendance";
 import HubShell from "./app-shell";
-import { SubjectSheet, skippable } from "./subject-sheet";
+import { SubjectSheet } from "./subject-sheet";
 import { TodoList } from "./todo-list";
 import {
   attendanceTone,
@@ -359,10 +359,6 @@ function OverviewBody() {
     .filter((subject) => subject.held > 0 && subject.percent < 75)
     .sort((a, b) => a.percent - b.percent);
   // Volumes come from the same saved snapshot the attendance tab reads.
-  const overallHeld = (liveAttendance?.subjects ?? []).reduce((total, subject) => total + subject.held, 0);
-  const overallAttended = (liveAttendance?.subjects ?? []).reduce((total, subject) => total + subject.present, 0);
-  const overallPercent = overallHeld ? (overallAttended / overallHeld) * 100 : 0;
-  const canMiss = skippable(overallAttended, overallHeld);
   const sheetSubject = liveAttendance?.subjects?.find((subject) => subject.code === sheetCode) ?? null;
   const timetableSynced = timetable?.fetchedAt
     ? new Date(timetable.fetchedAt).toLocaleTimeString("en-IN", { timeZone: IST_TIME_ZONE, hour: "2-digit", minute: "2-digit" })
@@ -565,26 +561,6 @@ function OverviewBody() {
             </div>
           ) : (
             <>
-              <div className="homeAttHero">
-                <div
-                  className="homeAttRing"
-                  style={{ "--pct": Math.max(0, Math.min(100, overallPercent)) } as CSSProperties}
-                  role="img"
-                  aria-label={`Overall attendance ${overallPercent.toFixed(1)} percent, 75 percent minimum`}
-                >
-                  <div><strong>{overallPercent.toFixed(1)}%</strong><span>overall</span></div>
-                </div>
-                <div className="homeAttCopy">
-                  <h3>{canMiss > 0 ? `You can miss ${canMiss} classes` : "No classes to spare"}</h3>
-                  <p>
-                    {canMiss > 0 ? <>and stay above <b>75%</b>. </> : <>Attend the next classes to climb back over <b>75%</b>. </>}
-                    {atRiskRows.length
-                      ? <>Lowest: <b>{atRiskRows[0].name || atRiskRows[0].code} {atRiskRows[0].percent.toFixed(1)}%</b>.</>
-                      : "Every subject is above the 75% line."}
-                  </p>
-                </div>
-              </div>
-
               {atRiskRows.length ? (
                 <div className="critRows">
                   {atRiskRows.map((row) => (

@@ -476,10 +476,16 @@ export function ImsLoginGate() {
     {attendance && open && <div className="imsLoggedInBanner" suppressHydrationWarning><span><b>{attendance.name || attendance.roll}</b> · attendance saved on this device{attendance.syncedAt ? ` · synced ${new Date(attendance.syncedAt).toLocaleString()}` : ""}</span><button type="button" onClick={() => startResync()}><RefreshCw size={14}/> Sync again</button><button type="button" onClick={() => setOpen(false)}>Continue to dashboard</button><button type="button" onClick={logout} aria-label="Log out of IMS"><LogOut size={15}/></button></div>}
     {((open && !attendance) || syncing) && <div className="imsGateBackdrop" role="dialog" aria-modal="true" aria-labelledby="imsGateTitle">
       <div className="imsGateShell">
-      <div className="imsGateBrand">
+      <aside className="imsGateAside">
         <BrandLogo />
-        <p>Attendance, results and notices, one tap away.</p>
-      </div>
+        <h1 className="imsGateAsideTitle">Your whole semester, one sign-in away.</h1>
+        <ul className="imsGateAsideList">
+          <li><Activity size={15} aria-hidden="true" /> Attendance with the 75% line and what-if counts</li>
+          <li><Trophy size={15} aria-hidden="true" /> Result history across semesters</li>
+          <li><CalendarDays size={15} aria-hidden="true" /> Timetable and notices that keep working offline</li>
+        </ul>
+        <p className="imsGateAsideNote">Unofficial student project. Your IMS password goes only to NSUT&apos;s portal.</p>
+      </aside>
       <form className="imsGateCard" onSubmit={submit}>
         <div className="imsGateHead">
           <div className="imsGateMark"><LockKeyhole size={18}/></div>
