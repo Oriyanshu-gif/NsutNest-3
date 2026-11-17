@@ -1,5 +1,6 @@
 "use client";
 
+import { imsFetch } from "../lib/ims-client";
 /**
  * NsutNest dashboard.
  *
@@ -11,7 +12,12 @@
  * are no estimated percentages and no fabricated exam dates.
  */
 
+<<<<<<< HEAD
 import { useEffect, useMemo, useState } from "react";
+=======
+import { apiUrl } from "../lib/api-base";
+import { useEffect, useMemo, useRef, useState } from "react";
+>>>>>>> 3be759ca70fa489a79cf0b167b8602c014591f8e
 import Link from "next/link";
 import {
   Activity,
@@ -313,10 +319,61 @@ function OverviewBody() {
 
   useEffect(() => {
     let active = true;
+<<<<<<< HEAD
     loadStudents().then(
       (rows) => active && setStudents(rows),
       (failure) => active && setError(failure instanceof Error ? failure.message : "Could not load results data."),
     );
+=======
+    let cached: TimetablePayload | null = null;
+
+    try {
+      const raw = readStoredTimetable();
+      if (raw) {
+        const parsed = JSON.parse(raw) as TimetablePayload;
+        if (parsed?.roll?.toUpperCase() === roll.toUpperCase() && Array.isArray(parsed.slots)) {
+          cached = parsed;
+          setTimetable(parsed);
+          const fetched = new Date(parsed.fetchedAt).getTime();
+          if (!force && Number.isFinite(fetched) && Date.now() - fetched < 6 * 60 * 60 * 1000) {
+            setTimetableError("");
+            setTimetableLoading(false);
+            return;
+          }
+        }
+      }
+    } catch {
+      // A corrupt cache is treated like no cache.
+    }
+
+    if (!cached) setTimetable(null);
+    setTimetableError("");
+    setTimetableLoading(true);
+
+    imsFetch("/api/ims/timetable", { cache: "no-store" })
+      .then(async (response) => {
+        const body = (await response.json().catch(() => ({}))) as TimetablePayload & { error?: string };
+        if (!response.ok) throw new Error(body.error || "Could not load your IMS timetable.");
+        if (!Array.isArray(body.slots)) throw new Error("IMS returned an empty timetable.");
+        if (body.roll && body.roll.trim().toUpperCase() !== roll.toUpperCase()) {
+          throw new Error("IMS returned a timetable for a different account.");
+        }
+        return { ...body, fetchedAt: body.fetchedAt || new Date().toISOString() };
+      })
+      .then((payload) => {
+        if (!active) return;
+        writeStoredTimetable(JSON.stringify(payload));
+        setTimetable(payload);
+        setTimetableError("");
+      })
+      .catch((failure) => {
+        if (active) setTimetableError(failure instanceof Error ? failure.message : "Could not load your IMS timetable.");
+      })
+      .finally(() => {
+        if (active) setTimetableLoading(false);
+      });
+
+>>>>>>> 3be759ca70fa489a79cf0b167b8602c014591f8e
     return () => {
       active = false;
     };

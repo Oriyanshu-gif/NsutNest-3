@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { load } from 'cheerio';
 import {
-  encodeImsSession,
   findLink,
-  IMS_COOKIE_NAME,
-  imsCookieOptions,
   pageText,
   readImsFrames,
   readImsSession,
@@ -13,6 +10,8 @@ import {
   sessionMatchesId,
   type ImsHttpPage,
   type ImsHttpSession,
+  clearImsSession,
+  readImsSessionFrom,
 } from '../../../../lib/ims-http';
 import { loginFailureMessage, safeUpstreamError } from '../../../../lib/ims-auth-errors';
 import { rateLimit, requestKey } from '../../../../lib/rate-limit';
@@ -169,7 +168,7 @@ export async function POST(request: NextRequest) {
     confirmChoices?: boolean;
   };
   try { body = await request.json(); } catch { return NextResponse.json({ error: 'Invalid request.' }, { status: 400 }); }
-  const session = readImsSession(request.cookies.get(IMS_COOKIE_NAME)?.value);
+  const session = readImsSessionFrom(request);
   // Binding the body to the cookie's random session id stops a request from
   // driving someone else's half-finished login.
   if (!sessionMatchesId(session, body.sessionId)) {
@@ -209,7 +208,7 @@ export async function POST(request: NextRequest) {
           .join(' ');
         const message = loginFailureMessage(errorText);
         const response = NextResponse.json({ error: message }, { status: 401, headers: { 'Cache-Control': 'no-store' } });
-        response.cookies.set(IMS_COOKIE_NAME, '', { ...imsCookieOptions(), maxAge: 0 });
+        clearImsSession(response);
         return response;
       }
 
@@ -275,7 +274,7 @@ export async function POST(request: NextRequest) {
     const response = NextResponse.json({
       error: safe.message,
     }, { status: safe.status, headers: { 'Cache-Control': 'no-store' } });
-    response.cookies.set(IMS_COOKIE_NAME, '', { ...imsCookieOptions(), maxAge: 0 });
+    clearImsSession(response);
     return response;
   }
 }

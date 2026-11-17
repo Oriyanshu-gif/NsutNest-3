@@ -1,5 +1,6 @@
 "use client";
 
+import { imsFetch } from "../lib/ims-client";
 /**
  * Shared application shell (web + installed PWA).
  *
@@ -9,6 +10,7 @@
  * the page asks the IMS gate for a refresh, exactly like the attendance button.
  */
 
+import { apiUrl } from "../lib/api-base";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -176,7 +178,7 @@ export default function HubShell({ children }: { children: ReactNode }) {
     if (profileFetchAttempts.has(key)) return;
     profileFetchAttempts.add(key);
 
-    fetch("/api/ims/profile", { cache: "no-store" })
+    imsFetch("/api/ims/profile", { cache: "no-store" })
       .then(async (response) => {
         const body = (await response.json()) as StoredImsProfile & { error?: string };
         if (!response.ok) throw new Error(body.error || "Profile unavailable");
@@ -287,6 +289,23 @@ export default function HubShell({ children }: { children: ReactNode }) {
     };
   }, []);
 
+<<<<<<< HEAD
+=======
+  // IMS ends an idle session on its own, and the next refresh then costs a new
+  // CAPTCHA. Touching the session in the background keeps a student who signed
+  // in once signed in, without ever showing them another one.
+  useEffect(() => {
+    const ping = () => {
+      if (document.visibilityState === "visible") {
+        void imsFetch("/api/ims/keepalive", { method: "POST", cache: "no-store" }).catch(() => {});
+      }
+    };
+    ping();
+    const timer = window.setInterval(ping, 8 * 60 * 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+>>>>>>> 3be759ca70fa489a79cf0b167b8602c014591f8e
   function toggleSidebar() {
     setCollapsed((current) => {
       const next = !current;

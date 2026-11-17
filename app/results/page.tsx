@@ -212,7 +212,7 @@ function ResultsBoard() {
               {shown.map((e, i) => {
                 const headline = semesterFilter === null ? e.cgpa : e.record?.sgpa ?? null;
                 return (
-                  <Link href={`/student/${encodeURIComponent(e.roll)}`} className="rsCard" key={e.roll}>
+                  <Link href={`/student?roll=${encodeURIComponent(e.roll)}`} className="rsCard" key={e.roll}>
                     <div className="rsCardTop">
                       <div className={`rsRank${i < 3 ? ` rsRank${i + 1}` : ""}`}>#{i + 1}</div>
                       <div className="rsIdentity">

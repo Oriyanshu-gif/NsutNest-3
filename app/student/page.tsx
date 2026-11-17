@@ -1,21 +1,21 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import {   ArrowLeft, GraduationCap, Trophy, TrendingUp, Info, BookOpen, Loader2, AlertTriangle,
 } from "lucide-react";
-import BrandLogo from "../../brand-logo";
-import { LiveViewCount } from "../../live-views";
+import BrandLogo from "../brand-logo";
+import { LiveViewCount } from "../live-views";
 import {
   GRADE_POINTS, SEMESTERS, academicYearLabel, examPeriod, gradeDistribution, loadStudents,
   loadSubjectData, sgpaLabel, subjectCredits, weightedCgpa,
   type Student, type SubjectData, type SemesterMarks,
-} from "../../../lib/data";
+} from "../../lib/data";
 
-export default function StudentProfile() {
-  const params = useParams<{ roll: string }>();
-  const roll = decodeURIComponent(params.roll || "");
+function StudentProfile() {
+  // The roll lives in the query so the page can be exported into the Android build.
+  const roll = decodeURIComponent(useSearchParams().get("roll") || "");
   const [students, setStudents] = useState<Student[] | null>(null);
   const [subjectData, setSubjectData] = useState<SubjectData | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -336,4 +336,8 @@ export default function StudentProfile() {
       </section>
     </>,
   );
+}
+
+export default function StudentProfilePage() {
+  return <Suspense fallback={null}><StudentProfile /></Suspense>;
 }

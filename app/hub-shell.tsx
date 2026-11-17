@@ -1,11 +1,13 @@
 "use client";
 
+import { forgetImsToken, imsFetch } from "../lib/ims-client";
 /**
  * Shared shell for the NsutNest dashboard: fixed left sidebar and the top bar
  * with breadcrumb, notification bell and semester chip. The main content area
  * scrolls with the page; the sidebar and (on desktop) the top bar stay put.
  */
 
+import { apiUrl } from "../lib/api-base";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Activity, Bell, BookOpen, Briefcase, CalendarDays, Home, Trophy, Users, type LucideIcon, LockKeyhole, RefreshCw, Eye, EyeOff, Loader2, LogOut } from "lucide-react";
@@ -120,7 +122,7 @@ export function ImsLoginGate() {
   async function newCaptcha(preserveError = false) {
     setCaptchaLoading(true); if (!preserveError) setError(""); setCaptchaText("");
     try {
-      const res = await fetch("/api/ims/session", { method: "POST", cache: "no-store" });
+      const res = await imsFetch("/api/ims/session", { method: "POST", cache: "no-store" });
       const body = await res.json();
       if (!res.ok) throw new Error(body.error || "Could not start an IMS login session.");
       setSessionId(body.sessionId);
@@ -234,7 +236,7 @@ export function ImsLoginGate() {
     let failureMessage = "Could not load attendance right now. Please try again.";
     try {
       const isConfirming = confirmation !== null;
-      const res = await fetch("/api/ims/attendance", {
+      const res = await imsFetch("/api/ims/attendance", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         cache: "no-store",
@@ -285,6 +287,7 @@ export function ImsLoginGate() {
 
   function logout() {
     clearStoredAttendance();
+    forgetImsToken();
     // Logging out is the "forget me" action: saved credentials and the cached
     // IMS photograph go too.
     clearRememberedImsId();
@@ -314,7 +317,7 @@ export function ImsLoginGate() {
     let failure = "";
     window.dispatchEvent(new CustomEvent(ATTENDANCE_REFRESH_STATUS_EVENT, { detail: true }));
     try {
-      const res = await fetch("/api/ims/refresh", { method: "POST", cache: "no-store" });
+      const res = await imsFetch("/api/ims/refresh", { method: "POST", cache: "no-store" });
       const body = (await res.json().catch(() => ({}))) as RefreshApiResponse;
       if (res.ok && Array.isArray(body.subjects) && body.subjects.length) {
         const payload = { ...body, subjects: withResolvedSubjectNames(body.subjects) } as LiveAttendance;
