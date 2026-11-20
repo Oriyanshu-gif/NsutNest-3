@@ -1,0 +1,146 @@
+/*
+ * Dashboard additions: the display face, the attendance hero with its critical
+ * rows, the to-do list and the subject sheet. Every colour here comes from
+ * app/styles/tokens.css, so light mode follows without extra rules.
+ */
+
+/* Critical subjects: only rows under the 75% line reach the dashboard. */
+.critRows{display:flex; flex-direction:column; gap:8px}
+.critRow{
+  display:grid; grid-template-columns:1fr auto; gap:2px 10px; padding:11px 13px; text-align:left;
+  border-radius:10px; border:1px solid var(--color-border); background:var(--color-surface);
+  color:var(--color-text); cursor:pointer;
+}
+.critRow:hover{border-color:var(--color-accent-border)}
+.critRow:focus-visible{outline:2px solid var(--color-accent); outline-offset:2px}
+.critName{display:flex; align-items:center; gap:8px; min-width:0}
+.critName b{font-size:13px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.critPct{font:600 13px var(--font-display); font-variant-numeric:tabular-nums; color:var(--color-danger)}
+.critBar{grid-column:1/-1; position:relative; height:4px; margin-top:6px; border-radius:999px; background:var(--color-border)}
+.critBar i{position:absolute; inset:0 auto 0 0; border-radius:999px; background:var(--color-danger)}
+.critBar u{position:absolute; top:-2px; bottom:-2px; left:75%; width:1.5px; border-radius:2px; text-decoration:none; background:color-mix(in srgb, var(--color-text) 45%, transparent)}
+
+/* To-do list */
+.todoAdd{display:flex; gap:8px; margin-bottom:10px}
+.todoAdd input{
+  flex:1; min-width:0; padding:10px 12px; border-radius:10px;
+  border:1px solid var(--color-border); background:var(--color-surface); color:var(--color-text);
+  font:400 13px var(--font-sans);
+}
+.todoAdd input::placeholder{color:var(--color-muted)}
+.todoAdd input:focus-visible{outline:2px solid var(--color-accent); outline-offset:1px}
+.todoAdd button{
+  display:inline-flex; align-items:center; gap:6px; padding:10px 13px; border-radius:10px;
+  border:1px solid var(--color-accent-border); background:var(--color-accent); color:var(--color-accent-contrast);
+  font:600 12.5px var(--font-sans); cursor:pointer;
+}
+.todoAdd button:disabled{opacity:.45; cursor:default}
+.todoEmpty{margin:0; font-size:12.5px; color:var(--color-muted)}
+.todoList{display:flex; flex-direction:column; gap:6px; margin:0; padding:0; list-style:none}
+.todoItem{
+  display:flex; align-items:center; gap:10px; padding:10px 12px;
+  border-radius:10px; border:1px solid var(--color-border); background:var(--color-surface);
+}
+.todoItem b{flex:1; min-width:0; font-size:13px; font-weight:500; overflow-wrap:anywhere}
+.todoItem.done b{color:var(--color-muted); text-decoration:line-through}
+.todoCheck{
+  display:grid; place-items:center; flex:0 0 22px; width:22px; height:22px; border-radius:6px;
+  border:1px solid var(--color-border); background:var(--color-bg); color:var(--color-accent-contrast); cursor:pointer;
+}
+.todoItem.done .todoCheck{background:var(--color-accent); border-color:var(--color-accent)}
+.todoCheck:focus-visible,.todoDelete:focus-visible{outline:2px solid var(--color-accent); outline-offset:2px}
+.todoDelete{
+  display:grid; place-items:center; width:26px; height:26px; border:0; border-radius:6px;
+  background:transparent; color:var(--color-muted); cursor:pointer;
+}
+.todoDelete:hover{color:var(--color-danger)}
+
+/* Subject sheet: bottom sheet on a phone, centred panel on a wide screen. */
+.sheetBackdrop{
+  position:fixed; inset:0; z-index:1200; display:grid; place-items:end center;
+  background:rgba(3,6,10,.66); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);
+}
+.sheetPanel{
+  width:100%; max-width:560px; max-height:92vh; overflow:auto; padding:18px 16px calc(18px + env(safe-area-inset-bottom,0px));
+  border:1px solid var(--color-border); border-bottom:0; border-radius:18px 18px 0 0; background:var(--color-bg);
+}
+@media(min-width:640px){
+  .sheetBackdrop{place-items:center; padding:20px}
+  .sheetPanel{border-bottom:1px solid var(--color-border); border-radius:18px; padding:20px}
+}
+.sheetHead{display:flex; align-items:flex-start; gap:12px; margin-bottom:14px}
+.sheetHead h2{margin:0 0 3px; font:600 16px/1.3 var(--font-display); letter-spacing:-.01em}
+.sheetHead p{margin:0; font-size:12px; color:var(--color-muted)}
+.sheetClose{
+  display:grid; place-items:center; flex:0 0 32px; width:32px; height:32px; margin-left:auto;
+  border-radius:9px; border:1px solid var(--color-border); background:var(--color-surface);
+  color:var(--color-muted); cursor:pointer;
+}
+.sheetClose:focus-visible{outline:2px solid var(--color-accent); outline-offset:2px}
+.sheetStats{display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:12px}
+.sheetStats > div{padding:10px 11px; border-radius:10px; border:1px solid var(--color-border); background:var(--color-surface)}
+.sheetStats span{display:block; font-size:9.5px; letter-spacing:.06em; text-transform:uppercase; color:var(--color-muted)}
+.sheetStats b{display:block; margin-top:4px; font:600 16px/1.1 var(--font-display); font-variant-numeric:tabular-nums}
+/* What-if simulator: two counters, each showing the percentage it would produce. */
+.sim{display:flex; flex-direction:column; gap:6px; margin-bottom:14px}
+.simRow{
+  display:grid; grid-template-columns:1fr auto auto; align-items:center; gap:10px; padding:9px 12px;
+  border-radius:10px; border:1px solid var(--color-border); background:var(--color-surface);
+  font-size:12.5px; color:var(--color-text);
+}
+.simLabel{min-width:0}
+.simLabel b{font:600 13px var(--font-display); font-variant-numeric:tabular-nums}
+.simStep{display:flex; gap:4px}
+.simStep button{
+  display:grid; place-items:center; width:26px; height:26px; border-radius:7px;
+  border:1px solid var(--color-border); background:var(--color-bg); color:var(--color-text);
+  font:600 14px/1 var(--font-display); cursor:pointer;
+}
+.simStep button:hover:not(:disabled){border-color:var(--color-accent-border); color:var(--color-accent)}
+.simStep button:disabled{opacity:.4; cursor:default}
+.simStep button:focus-visible{outline:2px solid var(--color-accent); outline-offset:1px}
+.simRow strong{min-width:56px; text-align:right; font:600 14px var(--font-display); font-variant-numeric:tabular-nums}
+.simRow strong.good{color:var(--color-accent)}
+.simRow strong.bad{color:var(--color-danger)}
+.simNote{margin:2px 0 0; font-size:11.5px; color:var(--color-muted)}
+.simNote b{color:var(--color-text); font-weight:600}
+.sheetPanel .attendanceCalendar{max-width:none; margin:0}
+
+/*
+ * Home header: the date and the two actions share one row so the greeting runs
+ * the full width instead of leaving an empty band beside it.
+ */
+.nestHeadStacked{display:block}
+.nestHeadTop{display:flex; align-items:center; justify-content:space-between; gap:12px}
+.nestHeadStacked .nestHeadCopy{width:100%; margin-top:10px}
+.nestHeadStacked .nestHead h1{margin-top:0}
+
+/* Brand mark: badge + N in a nest, painted by the active palette. */
+.nsutNestMark{width:var(--mark-size,38px); height:auto; aspect-ratio:1; flex-basis:var(--mark-size,38px); border-radius:0; background:none; object-fit:contain}
+.nsutNestMark .markBadge{fill:var(--color-accent)}
+.nsutNestMark .markGlyph,
+.nsutNestMark .markNest{fill:none; stroke:var(--color-accent-contrast); stroke-linecap:round; stroke-linejoin:round}
+.nsutNestMark .markGlyph{stroke-width:3.4}
+.nsutNestMark .markNest{stroke-width:2.4; opacity:.75}
+
+/* Palette chips in the More sheet. */
+.paletteGrid{display:flex; flex-wrap:wrap; gap:8px; padding:4px 0 2px}
+.paletteChip{
+  display:inline-flex; align-items:center; gap:7px; padding:8px 12px; border-radius:999px;
+  border:1px solid var(--color-border); background:var(--color-surface); color:var(--color-muted);
+  font:500 12.5px var(--font-sans); cursor:pointer;
+}
+.paletteChip i{width:12px; height:12px; border-radius:50%; display:block; border:1px solid rgba(255,255,255,.18)}
+.paletteChip:hover{border-color:var(--color-accent-border); color:var(--color-text)}
+.paletteChip.on{border-color:var(--color-accent-border); background:var(--color-accent-soft); color:var(--color-text); font-weight:600}
+.paletteChip:focus-visible{outline:2px solid var(--color-accent); outline-offset:2px}
+
+/* Days left, inside the exam sheet rows. */
+.nestExamDays{
+  display:inline-block; margin-left:6px; padding:2px 7px; border-radius:999px;
+  border:1px solid var(--color-border); background:var(--color-surface);
+  font-size:10.5px; font-weight:600; color:var(--color-muted); white-space:nowrap;
+}
+.nestExamDays.upcoming{border-color:var(--color-accent-border); background:var(--color-accent-soft); color:var(--color-accent)}
+.nestExamDays.today{border-color:var(--color-warning-border); background:var(--color-warning-bg); color:var(--color-warning-text)}
+.nestExamDays.passed{opacity:.6}

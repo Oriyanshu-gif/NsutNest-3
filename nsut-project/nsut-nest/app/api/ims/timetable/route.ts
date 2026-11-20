@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { safeUpstreamError } from '../../../../lib/ims-auth-errors';
 import {
-  encodeImsSession,
-  IMS_COOKIE_NAME,
-  imsCookieOptions,
   readImsSession,
+  clearImsSession,
+  readImsSessionFrom,
+  setImsSession,
 } from '../../../../lib/ims-http';
 import { ImsSessionExpiredError } from '../../../../lib/ims-profile';
 import { fetchImsTimetable } from '../../../../lib/ims-timetable-flow';
@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const session = readImsSession(request.cookies.get(IMS_COOKIE_NAME)?.value);
+  const session = readImsSessionFrom(request);
   if (!session || session.stage !== 'attendance' || !session.studentRoll || !session.navigationUrls?.length) {
     return NextResponse.json(
       { error: 'Sign in to NSUT IMS to load your timetable.', needsLogin: true },
@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
     // Discovery refreshes IMS cookies and can add session state; keep the
     // HttpOnly session cookie current without failing a good timetable read.
     try {
-      response.cookies.set(IMS_COOKIE_NAME, encodeImsSession(session), imsCookieOptions());
+      setImsSession(response, session);
     } catch {
       // The existing cookie still holds a valid session.
     }
@@ -53,7 +53,7 @@ export async function GET(request: NextRequest) {
         { error: 'Your IMS session expired. Sign in again to load your timetable.', needsLogin: true },
         { status: 401, headers: { 'Cache-Control': 'no-store' } },
       );
-      response.cookies.set(IMS_COOKIE_NAME, '', { ...imsCookieOptions(), maxAge: 0 });
+      clearImsSession(response);
       return response;
     }
 

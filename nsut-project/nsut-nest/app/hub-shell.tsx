@@ -1,16 +1,19 @@
 "use client";
 
+import { forgetImsToken, imsFetch } from "../lib/ims-client";
 /**
  * Shared shell for the NsutNest dashboard: fixed left sidebar and the top bar
  * with breadcrumb, notification bell and semester chip. The main content area
  * scrolls with the page; the sidebar and (on desktop) the top bar stay put.
  */
 
+import { apiUrl } from "../lib/api-base";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Activity, Bell, BookOpen, Briefcase, CalendarDays, Home, Trophy, Users, type LucideIcon, LockKeyhole, RefreshCw, Eye, EyeOff, Loader2, LogOut, ShieldCheck } from "lucide-react";
+import { Activity, Bell, BookOpen, Briefcase, CalendarDays, FileText, Home, Trophy, Users, type LucideIcon, LockKeyhole, RefreshCw, Eye, EyeOff, Loader2, LogOut, ShieldCheck } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import type { ReactNode } from "react";
+import AdmitCardPopup from "./admit-card-popup";
 import BrandLogo from "./brand-logo";
 import { LiveViewCount } from "./live-views";
 import { withResolvedSubjectNames } from "../lib/attendance";
@@ -21,6 +24,7 @@ import {
   PROFILE_SYNC_EVENT,
   clearRememberedImsId,
   clearRememberedPassword,
+  clearStoredAdmitCard,
   clearStoredAttendance,
   clearStoredProfile,
   clearStoredTimetable,
@@ -37,11 +41,13 @@ import {
   type StoredImsProfile,
 } from "../lib/app-storage";
 import { loadStudents } from "../lib/data";
+import { IMS_PASSWORD_REJECTED } from "../lib/ims-auth-errors";
 
 const NAV: { href: string; label: string; icon: LucideIcon }[] = [
   { href: "/", label: "Dashboard", icon: Home },
   { href: "/study-material", label: "Study material", icon: BookOpen },
   { href: "/results", label: "Results", icon: Trophy },
+  { href: "/admit-card", label: "Admit card", icon: FileText },
   { href: "/tnp", label: "TNP", icon: Briefcase },
   { href: "/community", label: "Community", icon: Users },
 ];
@@ -51,6 +57,7 @@ function crumb(pathname: string): string {
   if (pathname.startsWith("/study-material")) return "Study material";
   if (pathname.startsWith("/tnp")) return "TNP (Training & Placement)";
   if (pathname.startsWith("/results")) return "Results";
+  if (pathname.startsWith("/admit-card")) return "Admit card";
   if (pathname.startsWith("/community")) return "Community";
   if (pathname.startsWith("/profile")) return "My Profile";
   if (pathname.startsWith("/student")) return "Student profile";
@@ -165,7 +172,7 @@ export function ImsLoginGate() {
   async function newCaptcha(preserveError = false) {
     setCaptchaLoading(true); if (!preserveError) setError(""); setCaptchaText("");
     try {
-      const res = await fetch("/api/ims/session", { method: "POST", cache: "no-store" });
+      const res = await imsFetch("/api/ims/session", { method: "POST", cache: "no-store" });
       const body = await res.json();
       if (!res.ok) throw new Error(body.error || "Could not start an IMS login session.");
       setSessionId(body.sessionId);
@@ -279,7 +286,7 @@ export function ImsLoginGate() {
     let failureMessage = "Could not load attendance right now. Please try again.";
     try {
       const isConfirming = confirmation !== null;
-      const res = await fetch("/api/ims/attendance", {
+      const res = await imsFetch("/api/ims/attendance", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         cache: "no-store",
@@ -325,11 +332,16 @@ export function ImsLoginGate() {
       setConfirmation(null);
       await newCaptcha(true);
       setError(failureMessage);
+      // A password IMS refused will be refused again: drop the saved copy so the
+      // student types the current one instead of replaying it from storage.
+      if (failureMessage === IMS_PASSWORD_REJECTED) { clearRememberedPassword(); setPassword(""); setSavedCredentials(false); }
     }    finally { setLoading(false); }
   }
 
   function logout() {
     clearStoredAttendance();
+    clearStoredAdmitCard();
+    forgetImsToken();
     // Logging out is the "forget me" action: saved credentials and the cached
     // IMS photograph go too.
     clearRememberedImsId();
@@ -360,7 +372,7 @@ export function ImsLoginGate() {
     let failure = "";
     window.dispatchEvent(new CustomEvent(ATTENDANCE_REFRESH_STATUS_EVENT, { detail: true }));
     try {
-      const res = await fetch("/api/ims/refresh", { method: "POST", cache: "no-store" });
+      const res = await imsFetch("/api/ims/refresh", { method: "POST", cache: "no-store" });
       const body = (await res.json().catch(() => ({}))) as RefreshApiResponse;
       if (res.ok && Array.isArray(body.subjects) && body.subjects.length) {
         const payload = { ...body, subjects: withResolvedSubjectNames(body.subjects) } as LiveAttendance;
@@ -468,15 +480,22 @@ export function ImsLoginGate() {
       : "Sign in with your NSUT IMS account.";
 
   return <>
+    <AdmitCardPopup />
     {attendance && !open && <WhatsNew roll={attendance.roll || "ims"} />}
     {attendance && !open && <button className="imsSessionButton" type="button" onClick={() => setOpen(true)} suppressHydrationWarning><Activity size={15} /> {attendance.roll || "IMS connected"}</button>}
     {attendance && open && <div className="imsLoggedInBanner" suppressHydrationWarning><span><b>{attendance.name || attendance.roll}</b> · attendance saved on this device{attendance.syncedAt ? ` · synced ${new Date(attendance.syncedAt).toLocaleString()}` : ""}</span><button type="button" onClick={() => startResync()}><RefreshCw size={14}/> Sync again</button><button type="button" onClick={() => setOpen(false)}>Continue to dashboard</button><button type="button" onClick={logout} aria-label="Log out of IMS"><LogOut size={15}/></button></div>}
     {((open && !attendance) || syncing) && <div className="imsGateBackdrop" role="dialog" aria-modal="true" aria-labelledby="imsGateTitle">
       <div className="imsGateShell">
-      <div className="imsGateBrand">
+      <aside className="imsGateAside">
         <BrandLogo />
-        <p>Attendance, results and notices, one tap away.</p>
-      </div>
+        <h1 className="imsGateAsideTitle">Your whole semester, one sign-in away.</h1>
+        <ul className="imsGateAsideList">
+          <li><Activity size={15} aria-hidden="true" /> Attendance with the 75% line and what-if counts</li>
+          <li><Trophy size={15} aria-hidden="true" /> Result history across semesters</li>
+          <li><CalendarDays size={15} aria-hidden="true" /> Timetable and notices that keep working offline</li>
+        </ul>
+        <p className="imsGateAsideNote">Unofficial student project. Your IMS password goes only to NSUT&apos;s portal.</p>
+      </aside>
       <form className="imsGateCard" onSubmit={submit}>
         <div className="imsGateHead">
           <div className="imsGateMark"><LockKeyhole size={18}/></div>
@@ -509,7 +528,7 @@ export function ImsLoginGate() {
             <div className="imsSavedAccount">
               <span>
                 <b>{roll.trim()}</b>
-                <small>ID and password saved on this device</small>
+                <small>ID and password ready in this tab</small>
               </span>
               <button type="button" onClick={useDifferentAccount} disabled={loading || captchaLoading}>Use a different account</button>
             </div>
@@ -518,7 +537,7 @@ export function ImsLoginGate() {
             <label>Password<span className="imsPasswordWrap"><input name="password" autoComplete="current-password" type={showPassword ? "text" : "password"} value={password} onChange={e => updatePassword(e.target.value)} required placeholder="Your portal password" /><button type="button" onClick={() => setShowPassword(v => !v)} aria-label={showPassword ? "Hide password" : "Show password"}>{showPassword ? <EyeOff size={17}/> : <Eye size={17}/>}</button></span></label>
             <label className="imsRememberRow imsRememberCredentials">
               <input type="checkbox" checked={rememberCredentials} onChange={event => updateRememberCredentials(event.target.checked)} />
-              <span><b>Remember my IMS ID and password on this device</b><small>Saved in this browser; logging out erases them.</small></span>
+              <span><b>Remember my IMS password in this tab</b><small>ID stays on this device; the password is forgotten when the tab closes.</small></span>
             </label>
           </>}
           {captchaRequired && <>
@@ -534,6 +553,7 @@ export function ImsLoginGate() {
             </div>
             <input id="imsCaptchaInput" className="imsCaptchaInput" ref={captchaRef} value={captchaText} onChange={e => setCaptchaText(e.target.value)} required placeholder="Type the characters you see" autoComplete="off" autoCapitalize="off" autoCorrect="off" spellCheck={false} enterKeyHint="go" aria-describedby="imsCaptchaHint" />
             <small className="imsCaptchaHint" id="imsCaptchaHint">Wrong code? Only the image reloads — your details stay.</small>
+            <p className="imsCaptchaNote">This code is IMS&apos;s own — NsutNest never solves it. Enter it once and, while this tab stays open, IMS will not ask again for about 12 hours.</p>
           </>}
         </>}
         {error && <div className="imsGateError" role="alert">{error}</div>}

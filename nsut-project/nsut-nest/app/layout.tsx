@@ -1,8 +1,10 @@
 import type { Metadata, Viewport } from "next";
-import { Inter } from "next/font/google";
+import { Inter, Sora } from "next/font/google";
 import "./styles/tokens.css";
 import "./globals.css";
 import "./nest-paper.css";
+import "./home.css";
+import "./palettes.css";
 import { ImsLoginGate } from "./hub-shell";
 import { RegisterServiceWorker } from "./install-pwa";
 
@@ -21,6 +23,7 @@ export const metadata: Metadata = {
   appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "NSUT Nest" },
   icons: {
     icon: [
+      { url: "/icons/mark.svg", type: "image/svg+xml" },
       { url: "/icons/nsutnest-192.png", sizes: "192x192", type: "image/png" },
       { url: "/icons/nsutnest-512.png", sizes: "512x512", type: "image/png" },
     ],
@@ -35,11 +38,18 @@ const inter = Inter({
   display: "swap",
 });
 
+// Sora is variable: naming weights breaks next/font's axis parsing.
+const sora = Sora({
+  subsets: ["latin"],
+  variable: "--font-sora",
+  display: "swap",
+});
+
 /**
  * Run before the first paint so a saved light theme or Hinglish locale never
  * flashes the defaults. They must be inline: React has not hydrated yet.
  */
-const themeBootScript = `(function(){try{var t=window.localStorage.getItem("nsutnest-theme");if(t==="dark"||t==="light"){document.documentElement.setAttribute("data-theme",t);document.documentElement.style.colorScheme=t;}}catch(e){}})();`;
+const themeBootScript = `(function(){try{var t=window.localStorage.getItem("nsutnest-theme");if(t==="dark"||t==="light"){document.documentElement.setAttribute("data-theme",t);document.documentElement.style.colorScheme=t;}var p=window.localStorage.getItem("nsutnest-palette");if(p){document.documentElement.setAttribute("data-palette",p);}}catch(e){}})();`;
 
 const languageBootScript = `(function(){try{var l=window.localStorage.getItem("nsutnest-language");if(l==="hinglish"){document.documentElement.lang="hi-Latn";}}catch(e){}})();`;
 
@@ -48,7 +58,8 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <html
       lang="en-IN"
       data-theme="dark"
-      className={inter.variable}
+      data-palette="plum"
+      className={`${inter.variable} ${sora.variable}`}
       suppressHydrationWarning
     >
       <body suppressHydrationWarning>

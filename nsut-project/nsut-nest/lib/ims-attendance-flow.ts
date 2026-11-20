@@ -3,14 +3,14 @@ import { load } from 'cheerio';
 import { subjectCodesFromTables, subjectNamesFromPages } from './ims-attendance-html';
 import { parseAttendance } from './ims-attendance-parse';
 import {
-  encodeImsSession,
-  IMS_COOKIE_NAME,
-  imsCookieOptions,
   readImsFrames,
   readImsSession,
   requestIms,
   type ImsHttpPage,
   type ImsHttpSession,
+  clearImsSession,
+  readImsSessionFrom,
+  setImsSession,
 } from './ims-http';
 import { safeUpstreamError } from './ims-auth-errors';
 
@@ -120,7 +120,7 @@ export function confirmationResponse(
     required: { academicYear: !academicYear, semester: !semester },
     message,
   }, { headers: { 'Cache-Control': 'no-store' } });
-  response.cookies.set(IMS_COOKIE_NAME, encodeImsSession(session), imsCookieOptions());
+  setImsSession(response, session);
   return response;
 }
 
@@ -204,13 +204,13 @@ export async function submitAttendance(
     academicYear: year.label,
     selectedSemester: semester.label,
   }, { headers: { 'Cache-Control': 'no-store' } });
-  response.cookies.set(IMS_COOKIE_NAME, encodeImsSession(session), imsCookieOptions());
+  setImsSession(response, session);
   return response;
 }
 
 /** Reuse the IMS authenticated cookies; no password or CAPTCHA on a valid session. */
 export async function refreshImsAttendance(request: NextRequest) {
-  const session = readImsSession(request.cookies.get(IMS_COOKIE_NAME)?.value);
+  const session = readImsSessionFrom(request);
   if (!session || session.stage !== 'attendance' || !session.studentRoll || !session.navigationUrls?.length) {
     // Not an error the student caused: the saved session is simply gone, so the
     // client only has to offer the CAPTCHA. `needsLogin` is what drives that.
@@ -224,7 +224,7 @@ export async function refreshImsAttendance(request: NextRequest) {
     // IMS answers an expired session with its login form.
     if (looksSignedOut(pages)) {
       const response = NextResponse.json({ error: 'Your IMS session expired.', needsLogin: true }, { status: 401 });
-      response.cookies.set(IMS_COOKIE_NAME, '', { ...imsCookieOptions(), maxAge: 0 });
+      clearImsSession(response);
       return response;
     }
     const controls = readControls(pages);
@@ -233,7 +233,7 @@ export async function refreshImsAttendance(request: NextRequest) {
       // the client is told to start a fresh sign-in rather than left with a
       // button that silently does nothing.
       const response = NextResponse.json({ error: 'The saved IMS session can no longer be used.', needsLogin: true }, { status: 401 });
-      response.cookies.set(IMS_COOKIE_NAME, '', { ...imsCookieOptions(), maxAge: 0 });
+      clearImsSession(response);
       return response;
     }
     const year = findOption(controls.academicYear, session.academicYearValue || '');

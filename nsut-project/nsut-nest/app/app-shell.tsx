@@ -1,5 +1,6 @@
 "use client";
 
+import { imsFetch } from "../lib/ims-client";
 /**
  * Shared application shell (web + installed PWA).
  *
@@ -9,7 +10,9 @@
  * the page asks the IMS gate for a refresh, exactly like the attendance button.
  */
 
+import { apiUrl } from "../lib/api-base";
 import Link from "next/link";
+import { PalettePicker } from "./palette-picker";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
@@ -21,6 +24,7 @@ import {
   Briefcase,
   CalendarDays,
   Download,
+  FileText,
   Home,
   Loader2,
   MoreHorizontal,
@@ -32,6 +36,7 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react";
+import AdmitCardPopup from "./admit-card-popup";
 import BrandLogo from "./brand-logo";
 import { InstallBanner } from "./install-pwa";
 import {
@@ -68,6 +73,7 @@ const DESTINATIONS: Destination[] = [
   { href: "/notices", label: "Notices", short: "Notices", icon: Bell, nav: true, mobile: true },
   { href: "/study-material", label: "Study material", short: "Study Material", icon: BookOpen, nav: true, sheet: true, blurb: "Notes and resources" },
   { href: "/results", label: "Results", short: "Results", icon: Trophy, nav: true, mobile: true, sheet: true, blurb: "Marks and SGPA" },
+  { href: "/admit-card", label: "Admit card", short: "Admit Card", icon: FileText, nav: true, sheet: true, blurb: "End sem, printable" },
   { href: "/tnp", label: "TNP", short: "TNP", icon: Briefcase, nav: true, sheet: true, blurb: "Training & Placement" },
   { href: "/community", label: "Community", short: "Social", icon: Users, nav: true, sheet: true, blurb: "Campus life and scenes" },
 ];
@@ -87,6 +93,7 @@ function crumb(pathname: string): string {
   if (pathname.startsWith("/study-material")) return "Study material";
   if (pathname.startsWith("/tnp")) return "TNP (Training & Placement)";
   if (pathname.startsWith("/results")) return "Results";
+  if (pathname.startsWith("/admit-card")) return "Admit card";
   if (pathname.startsWith("/community")) return "Community";
   if (pathname.startsWith("/profile")) return "My Profile";
   if (pathname.startsWith("/student")) return "Student profile";
@@ -194,7 +201,7 @@ export default function HubShell({ children }: { children: ReactNode }) {
     if (profileFetchAttempts.has(key)) return;
     profileFetchAttempts.add(key);
 
-    fetch("/api/ims/profile", { cache: "no-store" })
+    imsFetch("/api/ims/profile", { cache: "no-store" })
       .then(async (response) => {
         const body = (await response.json()) as StoredImsProfile & { error?: string };
         if (!response.ok) throw new Error(body.error || "Profile unavailable");
@@ -311,7 +318,7 @@ export default function HubShell({ children }: { children: ReactNode }) {
   useEffect(() => {
     const ping = () => {
       if (document.visibilityState === "visible") {
-        void fetch("/api/ims/keepalive", { method: "POST", cache: "no-store" }).catch(() => {});
+        void imsFetch("/api/ims/keepalive", { method: "POST", cache: "no-store" }).catch(() => {});
       }
     };
     ping();
@@ -484,6 +491,11 @@ export default function HubShell({ children }: { children: ReactNode }) {
                 <span><b>My profile</b><small>IMS details and saved photograph</small></span>
               </Link>
             </div>
+
+            <div className="moreSheetSection">
+              <small className="moreSheetSectionLabel">Colour palette</small>
+              <PalettePicker />
+            </div>
           </section>
         </div>
       )}
@@ -524,6 +536,7 @@ export default function HubShell({ children }: { children: ReactNode }) {
 
         <main className="hubContent" ref={mainRef}>
           <InstallBanner />
+          <AdmitCardPopup />
           {children}
         </main>
       </div>

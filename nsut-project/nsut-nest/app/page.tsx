@@ -1,5 +1,6 @@
 "use client";
 
+import { imsFetch } from "../lib/ims-client";
 /**
  * NSUT Nest home — the paper PWA layout.
  *
@@ -10,6 +11,7 @@
  * board — no fabricated percentages or exam dates.
  */
 
+import { apiUrl } from "../lib/api-base";
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
@@ -53,6 +55,8 @@ import { downloadExamCalendar } from "../lib/exam-calendar";
 import type { TimetableEntry, TimetablePayload } from "../lib/ims-timetable";
 import { withResolvedSubjectNames } from "../lib/attendance";
 import HubShell from "./app-shell";
+import { SubjectSheet } from "./subject-sheet";
+import { TodoList } from "./todo-list";
 import {
   attendanceTone,
   OfflineBanner,
@@ -167,6 +171,7 @@ function OverviewBody() {
   const [timetableRequest, setTimetableRequest] = useState(0);
   const [campusClock, setCampusClock] = useState<ReturnType<typeof istNow> | null>(null);
   const forceTimetableRefresh = useRef(false);
+  const [sheetCode, setSheetCode] = useState<string | null>(null);
 
   useEffect(() => {
     const onStatus = (event: Event) => setAttendanceRefreshing(Boolean((event as CustomEvent<boolean>).detail));
@@ -264,7 +269,7 @@ function OverviewBody() {
     setTimetableError("");
     setTimetableLoading(true);
 
-    fetch("/api/ims/timetable", { cache: "no-store" })
+    imsFetch("/api/ims/timetable", { cache: "no-store" })
       .then(async (response) => {
         const body = (await response.json().catch(() => ({}))) as TimetablePayload & { error?: string };
         if (!response.ok) throw new Error(body.error || "Could not load your IMS timetable.");
@@ -353,6 +358,8 @@ function OverviewBody() {
   const atRiskRows = (liveAttendance?.subjects ?? [])
     .filter((subject) => subject.held > 0 && subject.percent < 75)
     .sort((a, b) => a.percent - b.percent);
+  // Volumes come from the same saved snapshot the attendance tab reads.
+  const sheetSubject = liveAttendance?.subjects?.find((subject) => subject.code === sheetCode) ?? null;
   const timetableSynced = timetable?.fetchedAt
     ? new Date(timetable.fetchedAt).toLocaleTimeString("en-IN", { timeZone: IST_TIME_ZONE, hour: "2-digit", minute: "2-digit" })
     : "";
@@ -387,9 +394,20 @@ function OverviewBody() {
       )}
 
       <div className="nestHome">
-        <header className="nestHead">
+        <header className="nestHead nestHeadStacked">
+          <div className="nestHeadTop">
+            {campusClock?.fullLabel ? <p className="nestDate">{campusClock.fullLabel}</p> : <span />}
+            <div className="nestHeadSide">
+              <Link className="nestIconBtn" href="/notices" aria-label="Open notices">
+                <Bell size={18} aria-hidden="true" />
+                {noticesPreview.length > 0 && <span className="nestBellDot" aria-hidden="true" />}
+              </Link>
+              <Link className="nestAvatar" href="/profile" aria-label="Open my profile">
+                {profilePhoto ? <img src={profilePhoto} alt="" /> : initials}
+              </Link>
+            </div>
+          </div>
           <div className="nestHeadCopy" suppressHydrationWarning>
-            {campusClock?.fullLabel && <p className="nestDate">{campusClock.fullLabel}</p>}
             <h1>
               {greetingText}
               {firstName ? `, ${firstName}` : ""}
@@ -399,15 +417,6 @@ function OverviewBody() {
                 ? `${attendanceFresh ? "Live from IMS" : "Saved attendance"} · ${liveAttendance.roll}`
                 : "Connect NSUT IMS to personalise this page"}
             </p>
-          </div>
-          <div className="nestHeadSide">
-            <Link className="nestIconBtn" href="/notices" aria-label="Open notices">
-              <Bell size={18} aria-hidden="true" />
-              {noticesPreview.length > 0 && <span className="nestBellDot" aria-hidden="true" />}
-            </Link>
-            <Link className="nestAvatar" href="/profile" aria-label="Open my profile">
-              {profilePhoto ? <img src={profilePhoto} alt="" /> : initials}
-            </Link>
           </div>
         </header>
 
@@ -464,31 +473,10 @@ function OverviewBody() {
           </div>
         </section>
 
-        <Link className={`nestRisk ${atRiskRows.length ? "hasRisk" : "isSafe"}`} href="/attendance">
-          <span className="nestRiskIcon" aria-hidden="true">
-            {atRiskRows.length ? <AlertTriangle size={18} /> : <ShieldCheck size={18} />}
-          </span>
-          <span className="nestRiskCopy">
-            <b>
-              {atRiskRows.length
-                ? `${atRiskRows.length} subject${atRiskRows.length === 1 ? "" : "s"} at risk`
-                : liveAttendance
-                  ? "Attendance is above the 75% line"
-                  : "See your attendance"}
-            </b>
-            <small>
-              {atRiskRows.length
-                ? atRiskRows.slice(0, 2).map((row) => `${row.name || row.code} ${row.percent.toFixed(1)}%`).join(" · ")
-                : liveAttendance ? "Every subject is above 75%" : "Connect IMS to load it"}
-            </small>
-          </span>
-          <span className="nestRiskLink">View all <ChevronRight size={12} aria-hidden="true" /></span>
-        </Link>
-
         <section className="nestSection" id="today" aria-labelledby="todayTitle">
           <div className="nestSectionHead">
             <div>
-              <p className="nestKicker">Today&apos;s classes</p>
+              <p className="nestKicker">Upcoming classes</p>
               <h2 id="todayTitle">{campusClock?.dayLong ?? "Today"}</h2>
             </div>
             <Link className="nestTextLink" href="/timetable">Full timetable <ChevronRight size={12} aria-hidden="true" /></Link>
@@ -552,6 +540,61 @@ function OverviewBody() {
               </div>
             </>
           )}
+        </section>
+
+        <section className="nestSection" id="attendance" aria-labelledby="homeAttTitle">
+          <div className="nestSectionHead">
+            <div>
+              <p className="nestKicker">Attendance</p>
+              <h2 id="homeAttTitle">Critical subjects</h2>
+            </div>
+            <Link className="nestTextLink" href="/attendance">All subjects <ChevronRight size={12} aria-hidden="true" /></Link>
+          </div>
+
+          {!attendanceReady ? (
+            <Skeleton rows={2} />
+          ) : !liveAttendance ? (
+            <div className="nestEmpty">
+              <AlertTriangle size={22} aria-hidden="true" />
+              <div><b>Connect IMS to see attendance</b><p>Subject-wise percentages load with your first sync.</p></div>
+              <button className="nestBtn nestBtnSmall" type="button" onClick={() => requestAttendanceRefresh()}>Connect IMS</button>
+            </div>
+          ) : (
+            <>
+              {atRiskRows.length ? (
+                <div className="critRows">
+                  {atRiskRows.map((row) => (
+                    <button
+                      className="critRow"
+                      type="button"
+                      key={row.code}
+                      onClick={() => setSheetCode(row.code)}
+                      aria-label={`${row.name || row.code}, ${row.percent.toFixed(1)} percent. Open what-if and calendar`}
+                    >
+                      <span className="critName"><span className="attCode">{row.code}</span><b>{row.name || row.code}</b></span>
+                      <span className="critPct">{row.percent.toFixed(1)}%</span>
+                      <span className="critBar"><i style={{ width: `${Math.max(0, Math.min(100, row.percent))}%` }} /><u /></span>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="nestEmpty">
+                  <ShieldCheck size={22} aria-hidden="true" />
+                  <div><b>No subject below 75%</b><p>Nothing critical right now.</p></div>
+                </div>
+              )}
+            </>
+          )}
+        </section>
+
+        <section className="nestSection" aria-labelledby="todoTitle">
+          <div className="nestSectionHead">
+            <div>
+              <p className="nestKicker">To-do</p>
+              <h2 id="todoTitle">Your list</h2>
+            </div>
+          </div>
+          <TodoList />
         </section>
 
         <section className="nestSection" id="notices" aria-labelledby="noticesTitle">
@@ -627,6 +670,7 @@ function OverviewBody() {
               <div className="nestExamRows">
                 {studentExams.map((exam) => {
                   const { dayOfWeek, formattedDate } = formatExamDate(exam.isoDate);
+                  const countdown = getExamCountdown(exam.isoDate);
                   const isNext = exam.code === nextExam?.code;
                   return (
                     <div className={`nestExamRow ${isNext ? "isNext" : ""}`} key={`${exam.code}-${exam.isoDate}`}>
@@ -637,7 +681,10 @@ function OverviewBody() {
                       </div>
                       <div className="nestExamBody">
                         <h3>{exam.name}</h3>
-                        <p>{exam.code} · {exam.shift}</p>
+                        <p>
+                          {exam.code} · {exam.shift}
+                          <span className={`nestExamDays ${countdown.status}`}>{countdown.label}</span>
+                        </p>
                         {isNext && <em>Next exam</em>}
                       </div>
                       <button
@@ -657,6 +704,22 @@ function OverviewBody() {
             </>
           )}
         </section>
+
+        {sheetSubject && (
+          <SubjectSheet
+            subject={{
+              title: sheetSubject.name || sheetSubject.code,
+              code: sheetSubject.code,
+              attended: sheetSubject.present,
+              held: sheetSubject.held,
+              percent: sheetSubject.percent,
+            }}
+            daily={liveAttendance?.daily ?? []}
+            attendanceLegend={liveAttendance?.attendanceLegend}
+            statusLegend={liveAttendance?.statusLegend}
+            onClose={() => setSheetCode(null)}
+          />
+        )}
 
         <footer className="nestFooter">
           <span>NSUT Nest · real IMS data, saved on this device</span>

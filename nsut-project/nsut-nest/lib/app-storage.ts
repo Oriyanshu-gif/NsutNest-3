@@ -15,6 +15,8 @@ export const TIMETABLE_STORAGE_KEY = "nsutnest_ims_timetable";
 export const TIMETABLE_SYNC_EVENT = "nsutnest-ims-timetable";
 export const ATTENDANCE_REFRESH_EVENT = "nsutnest-ims-refresh-request";
 export const ATTENDANCE_REFRESH_STATUS_EVENT = "nsutnest-ims-refresh-status";
+export const ADMIT_CARD_STORAGE_KEY = "nsutnest_ims_admit_card";
+export const ADMIT_CARD_SYNC_EVENT = "nsutnest-ims-admit-card";
 export const REMEMBERED_IMS_ROLL_KEY = "nsutnest_ims_roll";
 export const REMEMBERED_PASSWORD_KEY = "nsutnest_ims_password";
 /** Random id used only to count this browser in the live view counter. */
@@ -226,6 +228,52 @@ export function notifyProfileSync(): void {
  * changes that dialog's wording — `print` is a profile printout waiting for a
  * session, everything else is a plain refresh.
  */
+/**
+ * The generated admit card itself, so the printable sheet stays viewable later
+ * without the IMS password that produced it. One card, overwritten on regenerate.
+ */
+export type StoredAdmitCard = {
+  html: string;
+  title: string;
+  papers: { code: string; name: string }[];
+  generatedAt: string | null;
+  savedAt: string;
+  year?: string;
+  semester?: string;
+};
+
+export function readStoredAdmitCard(): StoredAdmitCard | null {
+  const raw = store("local")?.getItem(ADMIT_CARD_STORAGE_KEY);
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as StoredAdmitCard;
+    return typeof parsed?.html === "string" && parsed.html ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+/** A card with inlined photographs is a few hundred KB; anything huge is not a card. */
+export function writeStoredAdmitCard(card: StoredAdmitCard): void {
+  if (card.html.length > 2_000_000) return;
+  try {
+    store("local")?.setItem(ADMIT_CARD_STORAGE_KEY, JSON.stringify(card));
+    notifyAdmitCardSync();
+  } catch {
+    // A full localStorage must not break the card that is already on screen.
+  }
+}
+
+export function clearStoredAdmitCard(): void {
+  store("local")?.removeItem(ADMIT_CARD_STORAGE_KEY);
+  notifyAdmitCardSync();
+}
+
+export function notifyAdmitCardSync(): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new Event(ADMIT_CARD_SYNC_EVENT));
+}
+
 export function requestAttendanceRefresh(reason: "refresh" | "print" = "refresh"): void {
   if (typeof window === "undefined") return;
   window.dispatchEvent(new CustomEvent(ATTENDANCE_REFRESH_EVENT, { detail: reason }));
@@ -262,14 +310,15 @@ export function clearRememberedImsId(): void {
 /**
  * The IMS password, stored only when the student explicitly opts in.
  *
- * This is a plain-text credential in localStorage: readable by any script on
- * this origin and by anyone using the browser profile. It exists so a refresh
- * after the 20-minute IMS session lapses needs only a CAPTCHA, and it is wiped
- * on logout and whenever the checkbox is cleared.
+ * Kept in sessionStorage, not localStorage: it still prefills the next sign-in
+ * or admit-card refresh in this browser tab, but it no longer sits on disk for
+ * the next person at this machine (or any script on this origin) to read. Any
+ * copy an older build left in localStorage is deleted on sight.
  */
 export function readRememberedPassword(): string | null {
   try {
-    return store("local")?.getItem(REMEMBERED_PASSWORD_KEY) ?? null;
+    store("local")?.removeItem(REMEMBERED_PASSWORD_KEY);
+    return store("session")?.getItem(REMEMBERED_PASSWORD_KEY) ?? null;
   } catch {
     return null;
   }
@@ -277,7 +326,8 @@ export function readRememberedPassword(): string | null {
 
 export function writeRememberedPassword(value: string): void {
   try {
-    store("local")?.setItem(REMEMBERED_PASSWORD_KEY, value);
+    store("local")?.removeItem(REMEMBERED_PASSWORD_KEY);
+    store("session")?.setItem(REMEMBERED_PASSWORD_KEY, value);
   } catch {
     // Private-mode or full storage: the student still signs in, just without prefill.
   }
@@ -286,6 +336,7 @@ export function writeRememberedPassword(value: string): void {
 export function clearRememberedPassword(): void {
   try {
     store("local")?.removeItem(REMEMBERED_PASSWORD_KEY);
+    store("session")?.removeItem(REMEMBERED_PASSWORD_KEY);
   } catch {
     // Nothing stored means nothing to clear.
   }

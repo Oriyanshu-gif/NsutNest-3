@@ -1,0 +1,278 @@
+/*
+ * Colour palettes. Each one only redefines variables: the design tokens, the
+ * paper surfaces and the legacy variables the older screens still read, so a
+ * palette change recolours the whole app without touching a component.
+ *
+ * Plum is the default (html[data-palette] in layout.tsx); More → Colour palette
+ * switches it and stores the choice in localStorage.
+ */
+
+/* ---------------------------------------------------------------- plum */
+:root[data-theme="dark"][data-palette="plum"] {
+  --color-bg: #100a12;
+  --color-surface: #180f1c;
+  --color-border: #2b2130;
+  --color-nav: #130c16;
+  --color-text: #f5eef7;
+  --color-muted: #a89aae;
+  --color-accent: #ff9ecb;
+  --color-accent-soft: #2a1520;
+  --color-accent-border: #5c2b3f;
+  --color-accent-contrast: #210b15;
+  --color-hero-bg: #2a1520;
+  --color-hero-border: #5c2b3f;
+  --color-danger: #ff9b9b;
+  --color-danger-bg: #2a1416;
+  --color-danger-border: #6e2a33;
+  --color-danger-text: #ffc2c2;
+  --color-warning: #f0c27a;
+  --color-warning-bg: #2a2113;
+  --color-warning-border: #6b4e12;
+  --color-warning-text: #fbe0a8;
+
+  --bg: #100a12;
+  --panel: #180f1c;
+  --border: #2b2130;
+  --muted: #a89aae;
+  --text: #f5eef7;
+  --green: #ff9ecb;
+  --green-soft: #2a1520;
+  --green-line: #5c2b3f;
+  --hover: #221528;
+  --blue: #c8a8ff;
+}
+[data-palette="plum"] .hubPaper {
+  --paper-bg: #100a12;
+  --paper-surface: #180f1c;
+  --paper-sunk: #130c16;
+  --paper-ink: #140b18;
+  --paper-text: #f5eef7;
+  --paper-muted: #a89aae;
+  --paper-line: #2b2130;
+  --paper-line-strong: #443349;
+  --paper-lime: #ff9ecb;
+  --paper-lime-soft: #2a1520;
+  --paper-lime-ink: #ffc2dd;
+  --paper-rust: #ff9b9b;
+  --paper-rust-soft: #2a1416;
+  --paper-amber: #f0c27a;
+  --paper-amber-soft: #2a2113;
+  --paper-safe: #8ee3b4;
+  --paper-on-lime: #210b15;
+}
+
+/* ------------------------------------------------------------- emerald */
+:root[data-theme="dark"][data-palette="emerald"] {
+  --color-bg: #0b0f17;
+  --color-surface: #121826;
+  --color-border: #1e2738;
+  --color-nav: #0e1420;
+  --color-text: #f3f4f6;
+  --color-muted: #9aa4b2;
+  --color-accent: #34d399;
+  --color-accent-soft: #0f2a22;
+  --color-accent-border: #1f5e48;
+  --color-accent-contrast: #04160f;
+  --color-hero-bg: #0f2a22;
+  --color-hero-border: #1f5e48;
+  --color-danger: #f87171;
+  --color-danger-bg: #2a1416;
+  --color-danger-border: #7f2a30;
+  --color-danger-text: #fca5a5;
+  --color-warning: #fbbf24;
+  --color-warning-bg: #2a2110;
+  --color-warning-border: #6b4e12;
+  --color-warning-text: #fde68a;
+
+  --bg: #0b0e12;
+  --panel: #11151b;
+  --border: #1f2732;
+  --muted: #9aa7b4;
+  --text: #f3f6f9;
+  --green: #22c55e;
+  --green-soft: #12241b;
+  --green-line: #234734;
+  --hover: #17202a;
+  --blue: #38bdf8;
+}
+[data-palette="emerald"] .hubPaper {
+  --paper-bg: #0b0f17;
+  --paper-surface: #121821;
+  --paper-sunk: #0e141b;
+  --paper-ink: #0a0f14;
+  --paper-text: #eef3ef;
+  --paper-muted: #93a0ad;
+  --paper-line: #222d39;
+  --paper-line-strong: #344353;
+  --paper-lime: #c7f36b;
+  --paper-lime-soft: #1b2a16;
+  --paper-lime-ink: #bfe98a;
+  --paper-rust: #ff9b86;
+  --paper-rust-soft: #2a1517;
+  --paper-amber: #f0c27a;
+  --paper-amber-soft: #2a2113;
+  --paper-safe: #86e0a8;
+  --paper-on-lime: #10200e;
+}
+
+/* --------------------------------------------------------------- ocean */
+:root[data-theme="dark"][data-palette="ocean"] {
+  --color-bg: #071318;
+  --color-surface: #0d1c23;
+  --color-border: #1d3038;
+  --color-nav: #091820;
+  --color-text: #e8f4f6;
+  --color-muted: #8fa8b0;
+  --color-accent: #5eead4;
+  --color-accent-soft: #0d2b2a;
+  --color-accent-border: #1f5a54;
+  --color-accent-contrast: #04211d;
+  --color-hero-bg: #0d2b2a;
+  --color-hero-border: #1f5a54;
+  --color-danger: #ff9aa8;
+  --color-danger-bg: #2a141a;
+  --color-danger-border: #6e2431;
+  --color-danger-text: #ffc0c8;
+  --color-warning: #f2c879;
+  --color-warning-bg: #2a2312;
+  --color-warning-border: #6b4e12;
+  --color-warning-text: #fbe3b0;
+
+  --bg: #071318;
+  --panel: #0d1c23;
+  --border: #1d3038;
+  --muted: #8fa8b0;
+  --text: #e8f4f6;
+  --green: #5eead4;
+  --green-soft: #0d2b2a;
+  --green-line: #1f5a54;
+  --hover: #12262e;
+  --blue: #7fc8ff;
+}
+[data-palette="ocean"] .hubPaper {
+  --paper-bg: #071318;
+  --paper-surface: #0d1c23;
+  --paper-sunk: #091820;
+  --paper-ink: #08181e;
+  --paper-text: #e8f4f6;
+  --paper-muted: #8fa8b0;
+  --paper-line: #1d3038;
+  --paper-line-strong: #2f4b55;
+  --paper-lime: #5eead4;
+  --paper-lime-soft: #0d2b2a;
+  --paper-lime-ink: #a9f5e8;
+  --paper-rust: #ff9aa8;
+  --paper-rust-soft: #2a141a;
+  --paper-amber: #f2c879;
+  --paper-amber-soft: #2a2312;
+  --paper-safe: #7fe0b0;
+  --paper-on-lime: #04211d;
+}
+
+/* -------------------------------------------------------------- violet */
+:root[data-theme="dark"][data-palette="violet"] {
+  --color-bg: #0a0910;
+  --color-surface: #14121d;
+  --color-border: #262233;
+  --color-nav: #100e17;
+  --color-text: #f1eff7;
+  --color-muted: #9c97ad;
+  --color-accent: #b7a6ff;
+  --color-accent-soft: #1c1830;
+  --color-accent-border: #3b3163;
+  --color-accent-contrast: #100c1e;
+  --color-hero-bg: #1c1830;
+  --color-hero-border: #3b3163;
+  --color-danger: #ff8e8e;
+  --color-danger-bg: #2a1418;
+  --color-danger-border: #6e2a33;
+  --color-danger-text: #ffb4b4;
+  --color-warning: #f3c77b;
+  --color-warning-bg: #2a2113;
+  --color-warning-border: #6b4e12;
+  --color-warning-text: #fbe0a8;
+
+  --bg: #0a0910;
+  --panel: #14121d;
+  --border: #262233;
+  --muted: #9c97ad;
+  --text: #f1eff7;
+  --green: #b7a6ff;
+  --green-soft: #1c1830;
+  --green-line: #3b3163;
+  --hover: #1a1626;
+  --blue: #8fb8ff;
+}
+[data-palette="violet"] .hubPaper {
+  --paper-bg: #0a0910;
+  --paper-surface: #14121d;
+  --paper-sunk: #100e17;
+  --paper-ink: #0b0912;
+  --paper-text: #f1eff7;
+  --paper-muted: #9c97ad;
+  --paper-line: #262233;
+  --paper-line-strong: #3b3550;
+  --paper-lime: #b7a6ff;
+  --paper-lime-soft: #1c1830;
+  --paper-lime-ink: #c9bcff;
+  --paper-rust: #ff9b9b;
+  --paper-rust-soft: #2a1418;
+  --paper-amber: #f0c27a;
+  --paper-amber-soft: #2a2113;
+  --paper-safe: #8ee3b4;
+  --paper-on-lime: #100c1e;
+}
+
+/* ---------------------------------------------------------------- mono */
+:root[data-theme="dark"][data-palette="mono"] {
+  --color-bg: #0b0b0c;
+  --color-surface: #141416;
+  --color-border: #242427;
+  --color-nav: #101012;
+  --color-text: #f4f4f5;
+  --color-muted: #9b9ba1;
+  --color-accent: #f2f2f3;
+  --color-accent-soft: #222225;
+  --color-accent-border: #3f3f45;
+  --color-accent-contrast: #0b0b0c;
+  --color-hero-bg: #222225;
+  --color-hero-border: #3f3f45;
+  --color-danger: #ff8f8f;
+  --color-danger-bg: #261414;
+  --color-danger-border: #6b2a2a;
+  --color-danger-text: #ffbdbd;
+  --color-warning: #e5c88a;
+  --color-warning-bg: #262115;
+  --color-warning-border: #5c4c2a;
+  --color-warning-text: #f2e2bb;
+
+  --bg: #0b0b0c;
+  --panel: #141416;
+  --border: #242427;
+  --muted: #9b9ba1;
+  --text: #f4f4f5;
+  --green: #e9e9ec;
+  --green-soft: #222225;
+  --green-line: #3f3f45;
+  --hover: #1c1c1f;
+  --blue: #cfd3db;
+}
+[data-palette="mono"] .hubPaper {
+  --paper-bg: #0b0b0c;
+  --paper-surface: #141416;
+  --paper-sunk: #101012;
+  --paper-ink: #0d0d0f;
+  --paper-text: #f4f4f5;
+  --paper-muted: #9b9ba1;
+  --paper-line: #242427;
+  --paper-line-strong: #3a3a3f;
+  --paper-lime: #f2f2f3;
+  --paper-lime-soft: #222225;
+  --paper-lime-ink: #e9e9ec;
+  --paper-rust: #ff8f8f;
+  --paper-rust-soft: #261414;
+  --paper-amber: #e5c88a;
+  --paper-amber-soft: #262115;
+  --paper-safe: #dcdcdf;
+  --paper-on-lime: #0b0b0c;
+}

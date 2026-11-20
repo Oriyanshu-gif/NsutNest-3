@@ -11,7 +11,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Activity, ChevronRight, RefreshCw } from "lucide-react";
 import "../attendance-tab.css";
-import { SubjectAttendanceCalendar } from "../attendance-calendar";
+import { SubjectSheet } from "../subject-sheet";
 import {
   ATTENDANCE_REFRESH_STATUS_EVENT,
   ATTENDANCE_SYNC_EVENT,
@@ -91,8 +91,7 @@ function AttendanceBody() {
   const [liveAttendance, setLiveAttendance] = useState<LiveAttendancePayload | null>(null);
   const [ready, setReady] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [openCode, setOpenCode] = useState<string | null>(null);
-  const [month, setMonth] = useState("");
+  const [sheetCode, setSheetCode] = useState<string | null>(null);
   const [riskFirst, setRiskFirst] = useState(false);
 
   useEffect(() => {
@@ -141,19 +140,11 @@ function AttendanceBody() {
   const overall = heldTotal ? (attendedTotal / heldTotal) * 100 : 0;
   const atRisk = rows.filter((row) => row.percent < POLICY && row.held > 0).length;
 
-  // Months the portal actually has dated marks for, newest first.
-  const months = useMemo(
-    () => [...new Set((liveAttendance?.daily ?? []).map((day) => day.date.slice(0, 7)))].sort().reverse(),
-    [liveAttendance],
-  );
-
-  function toggle(code: string) {
-    setOpenCode((current) => (current === code ? null : code));
-    if (!month && months.length) setMonth(months[0]);
-  }
+  // Tapping a subject opens its sheet: what-if numbers, then the calendar.
+  const sheetRow = rows.find((row) => row.code === sheetCode) ?? null;
 
   return (
-    <div className="nestHome">
+    <div className="nestHome attPage">
       <header className="nestHead">
         <div className="nestHeadCopy">
           <p className="nestKicker">Live status</p>
@@ -218,15 +209,13 @@ function AttendanceBody() {
           <div className="attList">
             {orderedRows.map((row) => {
               const tone = attendanceTone(row.percent, row.held);
-              const open = openCode === row.code;
               return (
-                <div className={`attSubject ${tone} ${open ? "isOpen" : ""}`} key={row.code}>
+                <div className={`attSubject ${tone}`} key={row.code}>
                   <button
                     className="attSubjectHead"
                     type="button"
-                    onClick={() => toggle(row.code)}
-                    aria-expanded={open}
-                    aria-controls={`att-cal-${row.code}`}
+                    onClick={() => setSheetCode(row.code)}
+                    aria-haspopup="dialog"
                   >
                     <span className="attSubjectTitle">
                       <b>{row.title}</b>
@@ -240,24 +229,26 @@ function AttendanceBody() {
                       <em className={tone}>{TONE_LABEL[tone]}</em> · {actionLine(row, tone)}
                     </span>
                   </button>
-
-                  {open && (
-                    <div className="attCalendarWrap" id={`att-cal-${row.code}`}>
-                      <SubjectAttendanceCalendar
-                        subject={{ title: row.title, code: row.code }}
-                        daily={liveAttendance.daily ?? []}
-                        attendanceLegend={liveAttendance.attendanceLegend}
-                        statusLegend={liveAttendance.statusLegend}
-                        month={month || months[0] || ""}
-                        months={months}
-                        onMonthChange={setMonth}
-                      />
-                    </div>
-                  )}
                 </div>
               );
             })}
           </div>
+
+          {sheetRow && (
+            <SubjectSheet
+              subject={{
+                title: sheetRow.title,
+                code: sheetRow.code,
+                attended: sheetRow.attended,
+                held: sheetRow.held,
+                percent: sheetRow.percent,
+              }}
+              daily={liveAttendance.daily ?? []}
+              attendanceLegend={liveAttendance.attendanceLegend}
+              statusLegend={liveAttendance.statusLegend}
+              onClose={() => setSheetCode(null)}
+            />
+          )}
         </>
       )}
     </div>

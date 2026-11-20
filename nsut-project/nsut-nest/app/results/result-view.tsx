@@ -85,9 +85,6 @@ export default function ResultView({ students }: { students: Student[] }) {
           <h2 id="myResultTitle">{record.student.name}</h2>
           <p>{record.student.roll} · {record.student.branch} · {record.student.year} batch</p>
         </div>
-        <Link className="rsProfileLink" href={`/student/${encodeURIComponent(record.student.roll)}`}>
-          Full profile <ArrowUpRight size={13} />
-        </Link>
       </header>
 
       <div className="rsMineStats">
