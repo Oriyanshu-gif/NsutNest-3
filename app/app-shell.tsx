@@ -1,5 +1,6 @@
 "use client";
 
+import { imsFetch } from "../lib/ims-client";
 /**
  * Shared application shell (web + installed PWA).
  *
@@ -9,16 +10,21 @@
  * the page asks the IMS gate for a refresh, exactly like the attendance button.
  */
 
+import { apiUrl } from "../lib/api-base";
 import Link from "next/link";
+import { PalettePicker } from "./palette-picker";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import {
+  Activity,
   ArrowDown,
   Bell,
   BookOpen,
   Briefcase,
+  CalendarDays,
   Download,
+  FileText,
   Home,
   Loader2,
   MoreHorizontal,
@@ -30,6 +36,7 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react";
+import AdmitCardPopup from "./admit-card-popup";
 import BrandLogo from "./brand-logo";
 import { InstallBanner } from "./install-pwa";
 import {
@@ -43,18 +50,33 @@ import {
 } from "../lib/app-storage";
 import { loadStudents } from "../lib/data";
 
-type NavItem = { href: string; label: string; short: string; icon: LucideIcon };
+/**
+ * One list for the sidebar, the phone tab bar and the More sheet, so a new
+ * destination is added once instead of in three places.
+ */
+type Destination = {
+  href: string;
+  label: string;
+  short: string;
+  icon: LucideIcon;
+  blurb?: string;
+  nav?: boolean;
+  mobile?: boolean;
+  sheet?: boolean;
+};
 
-const NAV: NavItem[] = [
-  { href: "/", label: "Dashboard", short: "Dashboard", icon: Home },
-  { href: "/notices", label: "Notices", short: "Notices", icon: Bell },
-  { href: "/study-material", label: "Study material", short: "Study Material", icon: BookOpen },
-  { href: "/results", label: "Results", short: "Results", icon: Trophy },
-  { href: "/tnp", label: "TNP", short: "TNP", icon: Briefcase },
-  { href: "/community", label: "Community", short: "Social", icon: Users },
+const DESTINATIONS: Destination[] = [
+  { href: "/", label: "Dashboard", short: "Home", icon: Home, nav: true, mobile: true },
+  { href: "/attendance", label: "Attendance", short: "Attendance", icon: Activity, nav: true, mobile: true, sheet: true, blurb: "75% line and subjects" },
+  { href: "/#exams", label: "Exams", short: "Exams", icon: CalendarDays, sheet: true, blurb: "Date sheet and calendar" },
+  { href: "/timetable", label: "Timetable", short: "Timetable", icon: CalendarDays, nav: true, sheet: true, blurb: "Full week schedule" },
+  { href: "/notices", label: "Notices", short: "Notices", icon: Bell, nav: true, mobile: true },
+  { href: "/study-material", label: "Study material", short: "Study Material", icon: BookOpen, nav: true, sheet: true, blurb: "Notes and resources" },
+  { href: "/results", label: "Results", short: "Results", icon: Trophy, nav: true, mobile: true, sheet: true, blurb: "Marks and SGPA" },
+  { href: "/admit-card", label: "Admit card", short: "Admit Card", icon: FileText, nav: true, sheet: true, blurb: "End sem, printable" },
+  { href: "/tnp", label: "TNP", short: "TNP", icon: Briefcase, nav: true, sheet: true, blurb: "Training & Placement" },
+  { href: "/community", label: "Community", short: "Social", icon: Users, nav: true, sheet: true, blurb: "Campus life and scenes" },
 ];
-
-const MOBILE_NAV = NAV.filter((item) => ["/", "/notices", "/study-material", "/results"].includes(item.href));
 
 const SIDEBAR_STORAGE_KEY = "nsutnest_sidebar_collapsed";
 const INSTALL_EVENT = "nsutnest-install-request";
@@ -65,10 +87,13 @@ const profileFetchAttempts = new Set<string>();
 
 function crumb(pathname: string): string {
   if (pathname === "/") return "Dashboard";
+  if (pathname.startsWith("/attendance")) return "Attendance";
+  if (pathname.startsWith("/timetable")) return "Timetable";
   if (pathname.startsWith("/notices")) return "Notices";
   if (pathname.startsWith("/study-material")) return "Study material";
   if (pathname.startsWith("/tnp")) return "TNP (Training & Placement)";
   if (pathname.startsWith("/results")) return "Results";
+  if (pathname.startsWith("/admit-card")) return "Admit card";
   if (pathname.startsWith("/community")) return "Community";
   if (pathname.startsWith("/profile")) return "My Profile";
   if (pathname.startsWith("/student")) return "Student profile";
@@ -176,7 +201,7 @@ export default function HubShell({ children }: { children: ReactNode }) {
     if (profileFetchAttempts.has(key)) return;
     profileFetchAttempts.add(key);
 
-    fetch("/api/ims/profile", { cache: "no-store" })
+    imsFetch("/api/ims/profile", { cache: "no-store" })
       .then(async (response) => {
         const body = (await response.json()) as StoredImsProfile & { error?: string };
         if (!response.ok) throw new Error(body.error || "Profile unavailable");
@@ -287,6 +312,20 @@ export default function HubShell({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  // IMS ends an idle session on its own, and the next refresh then costs a new
+  // CAPTCHA. Touching the session in the background keeps a student who signed
+  // in once signed in, without ever showing them another one.
+  useEffect(() => {
+    const ping = () => {
+      if (document.visibilityState === "visible") {
+        void imsFetch("/api/ims/keepalive", { method: "POST", cache: "no-store" }).catch(() => {});
+      }
+    };
+    ping();
+    const timer = window.setInterval(ping, 8 * 60 * 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+
   function toggleSidebar() {
     setCollapsed((current) => {
       const next = !current;
@@ -312,9 +351,12 @@ export default function HubShell({ children }: { children: ReactNode }) {
       : (nameParts[0]?.[0] ?? "S").toUpperCase();
 
   const isActive = (href: string) => (href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`));
+  // The home and timetable screens use the warm paper PWA styling from the
+  // mockup; the rest of the workspace keeps its existing dark theme.
+  const paper = pathname === "/" || pathname.startsWith("/timetable") || pathname.startsWith("/attendance");
 
   return (
-    <div className={`hub ${collapsed ? "hubCollapsed" : ""}`}>
+    <div className={`hub ${collapsed ? "hubCollapsed" : ""} ${paper ? "hubPaper" : ""}`}>
       <aside className="hubSidebar">
         <div className="hubSidebarTop">
           <Link href="/" className="hubBrand" aria-label="NSUT Nest dashboard">
@@ -334,7 +376,7 @@ export default function HubShell({ children }: { children: ReactNode }) {
 
         <nav className="hubNav" aria-label="Main navigation">
           <div className="hubNavLabel">Workspace</div>
-          {NAV.map(({ href, label, icon: Icon }) => (
+          {DESTINATIONS.filter((item) => item.nav).map(({ href, label, icon: Icon }) => (
             <Link
               key={href}
               href={href}
@@ -370,12 +412,12 @@ export default function HubShell({ children }: { children: ReactNode }) {
       </aside>
 
       <nav className="mobileBottomNav" aria-label="Mobile navigation">
-        {MOBILE_NAV.map(({ href, label, short, icon: Icon }) => (
+        {DESTINATIONS.filter((item) => item.mobile).map(({ href, short, icon: Icon }) => (
           <Link
             key={href}
             href={href}
             aria-current={isActive(href) ? "page" : undefined}
-            aria-label={label}
+            aria-label={short}
             className={`mobileBottomNavItem ${isActive(href) ? "active" : ""}`}
           >
             <span className="mobileTabIcon">
@@ -422,14 +464,12 @@ export default function HubShell({ children }: { children: ReactNode }) {
             </div>
 
             <div className="moreSheetGrid">
-              <Link className="moreSheetLink" href="/tnp" onClick={() => setMoreOpen(false)}>
-                <span className="moreSheetIcon"><Briefcase size={18} /></span>
-                <span><b>TNP</b><small>Training &amp; Placement</small></span>
-              </Link>
-              <Link className="moreSheetLink" href="/community" onClick={() => setMoreOpen(false)}>
-                <span className="moreSheetIcon"><Users size={18} /></span>
-                <span><b>Community</b><small>Campus life and scenes</small></span>
-              </Link>
+              {DESTINATIONS.filter((item) => item.sheet).map(({ href, label, blurb, icon: Icon }) => (
+                <Link className="moreSheetLink" href={href} key={href} onClick={() => setMoreOpen(false)}>
+                  <span className="moreSheetIcon"><Icon size={18} /></span>
+                  <span><b>{label}</b><small>{blurb}</small></span>
+                </Link>
+              ))}
             </div>
 
             <div className="moreSheetSection">
@@ -450,6 +490,11 @@ export default function HubShell({ children }: { children: ReactNode }) {
                 <span className="moreSheetIcon"><Home size={18} /></span>
                 <span><b>My profile</b><small>IMS details and saved photograph</small></span>
               </Link>
+            </div>
+
+            <div className="moreSheetSection">
+              <small className="moreSheetSectionLabel">Colour palette</small>
+              <PalettePicker />
             </div>
           </section>
         </div>
@@ -491,6 +536,7 @@ export default function HubShell({ children }: { children: ReactNode }) {
 
         <main className="hubContent" ref={mainRef}>
           <InstallBanner />
+          <AdmitCardPopup />
           {children}
         </main>
       </div>

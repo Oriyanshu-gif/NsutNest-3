@@ -14,6 +14,8 @@ import {
   SEMESTERS, academicYearLabel, examPeriod, loadStudents, sgpaLabel, type Student,
 } from "../../lib/data";
 import HubShell from "../hub-shell";
+import ResultView from "./result-view";
+import { cohortOf } from "./record";
 
 const PAGE_SIZE = 20;
 const PAGE_STEP = 40;
@@ -52,6 +54,7 @@ function ResultsBoard() {
   const [semester, setSemester] = useState("All");
   const [branches, setBranches] = useState<string[]>([]);
   const [limit, setLimit] = useState(PAGE_SIZE);
+  const [view, setView] = useState<"mine" | "board">("mine");
 
   useEffect(() => {
     let active = true;
@@ -114,6 +117,31 @@ function ResultsBoard() {
 
   useEffect(() => { setLimit(PAGE_SIZE); }, [query, year, semester, branches]);
 
+  // Batch rank per roll, so a card can say where it stands inside its own class.
+  const cohortRanks = useMemo(() => {
+    const ranks = new Map<string, { rank: number; total: number }>();
+    if (!students) return ranks;
+    const best = new Map<string, number>();
+    for (const student of students) {
+      if (student.cgpa === null) continue;
+      const known = best.get(student.roll);
+      if (known === undefined || student.cgpa > known) best.set(student.roll, student.cgpa);
+    }
+    const groups = new Map<string, { roll: string; cgpa: number }[]>();
+    for (const [roll, cgpa] of best) {
+      const cohort = cohortOf(roll);
+      if (!cohort) continue;
+      const rows = groups.get(cohort) ?? [];
+      rows.push({ roll, cgpa });
+      groups.set(cohort, rows);
+    }
+    for (const rows of groups.values()) {
+      rows.sort((a, b) => b.cgpa - a.cgpa);
+      rows.forEach((row, index) => ranks.set(row.roll, { rank: index + 1, total: rows.length }));
+    }
+    return ranks;
+  }, [students]);
+
   const isFiltered = query.trim() !== "" || year !== "All" || semester !== "All" || branches.length > 0;
   const shown = board.slice(0, limit);
   const toggleBranch = (b: string) =>
@@ -126,10 +154,35 @@ function ResultsBoard() {
         <div>
           <small className="panelKicker">Gazette · B.Tech results</small>
           <h1>Results<span className="rsAccent">, ranked</span></h1>
-          <p>Every semester gazette and CGPA table, searchable by name, roll number, batch or branch.</p>
         </div>
       </header>
 
+      <div className="rsSwitch" role="tablist" aria-label="Results view">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={view === "mine"}
+          className={view === "mine" ? "on" : ""}
+          onClick={() => setView("mine")}
+        >
+          <GraduationCap size={14} aria-hidden="true" /> My Results &amp; Target Planner
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={view === "board"}
+          className={view === "board" ? "on" : ""}
+          onClick={() => setView("board")}
+        >
+          <Trophy size={14} aria-hidden="true" /> Batch Gazette &amp; Leaderboard
+        </button>
+      </div>
+
+      {view === "mine" && (students
+        ? <ResultView students={students} />
+        : <p className="rsNote">Loading the gazette…</p>)}
+
+      {view === "board" && (<>
       <section className="hubCard rsFilterPanel">
         <label className="rsSearch">
           <Search size={18} />
@@ -212,7 +265,7 @@ function ResultsBoard() {
               {shown.map((e, i) => {
                 const headline = semesterFilter === null ? e.cgpa : e.record?.sgpa ?? null;
                 return (
-                  <Link href={`/student/${encodeURIComponent(e.roll)}`} className="rsCard" key={e.roll}>
+                  <Link href={`/student?roll=${encodeURIComponent(e.roll)}`} className="rsCard" key={e.roll}>
                     <div className="rsCardTop">
                       <div className={`rsRank${i < 3 ? ` rsRank${i + 1}` : ""}`}>#{i + 1}</div>
                       <div className="rsIdentity">
@@ -222,6 +275,9 @@ function ResultsBoard() {
                           <span>{e.student.branch}</span>
                           <span className="rsTagMuted">{e.student.year} batch</span>
                           <span className="rsTagMuted">{e.semesters} semester{e.semesters === 1 ? "" : "s"}</span>
+                          {cohortRanks.get(e.roll) && (
+                            <span className="rsTagMuted">#{cohortRanks.get(e.roll)!.rank} in {cohortOf(e.roll) ?? "batch"}</span>
+                          )}
                         </div>
                       </div>
                       <div className="rsScore">
@@ -267,6 +323,7 @@ function ResultsBoard() {
           </button>
         )}
       </section>
+      </>)}
 
       <footer className="hubFooter">
         <p>NsutNest · unofficial student project</p>
