@@ -179,12 +179,17 @@ sent to the server; signing out removes it from both `localStorage` and `session
 Cached attendance without a student roll is treated as unidentified and requires a fresh
 sign-in before it can be shown alongside that student's published results.
 The sign-in form can remember the IMS ID on the current device using local browser storage.
-One unticked checkbox, **Remember my IMS ID and password on this device**, stores both in
-`localStorage` (`nsutnest_ims_roll`, `nsutnest_ims_password`) as plain text, so the next sign-in
-needs only the CAPTCHA. Ticking it saves whatever is in the fields, later edits follow, and
-unticking or logging out erases both. Because any script on this origin can read them, it should
-not be used on a shared or college machine; the browser's own password manager remains the safer
-option.
+One unticked checkbox, **Remember my IMS password in this tab**, stores the password in
+`sessionStorage` (`nsutnest_ims_password`) as plain text, so the next sign-in in that tab needs
+only the CAPTCHA. It is tab-local and gone when the tab closes; the IMS ID is separate, stays in
+`localStorage` (`nsutnest_ims_roll`) and is not a credential. Ticking it saves whatever is in the
+field, later edits follow, unticking or logging out erases both, and any copy an older build left
+in `localStorage` is deleted on the next read. A shared machine still sees the password while that
+tab is open, so the browser's own password manager remains the safer option.
+
+The temporary IMS session cookie is sealed with AES-256-GCM under `IMS_SESSION_SECRET`, so it
+reads as an opaque token rather than base64 JSON full of the student's portal cookies. Set that
+variable in the deployment environment; without it the cookie keeps working but stays readable.
 #### Can students sign in with only ID and password?
 
 Not today. Checked in October 2026: `imsnsit.org` publishes no API, no partner

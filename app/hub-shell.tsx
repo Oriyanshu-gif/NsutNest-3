@@ -41,6 +41,7 @@ import {
   type StoredImsProfile,
 } from "../lib/app-storage";
 import { loadStudents } from "../lib/data";
+import { IMS_PASSWORD_REJECTED } from "../lib/ims-auth-errors";
 
 const NAV: { href: string; label: string; icon: LucideIcon }[] = [
   { href: "/", label: "Dashboard", icon: Home },
@@ -331,6 +332,9 @@ export function ImsLoginGate() {
       setConfirmation(null);
       await newCaptcha(true);
       setError(failureMessage);
+      // A password IMS refused will be refused again: drop the saved copy so the
+      // student types the current one instead of replaying it from storage.
+      if (failureMessage === IMS_PASSWORD_REJECTED) { clearRememberedPassword(); setPassword(""); setSavedCredentials(false); }
     }    finally { setLoading(false); }
   }
 
@@ -524,7 +528,7 @@ export function ImsLoginGate() {
             <div className="imsSavedAccount">
               <span>
                 <b>{roll.trim()}</b>
-                <small>ID and password saved on this device</small>
+                <small>ID and password ready in this tab</small>
               </span>
               <button type="button" onClick={useDifferentAccount} disabled={loading || captchaLoading}>Use a different account</button>
             </div>
@@ -533,7 +537,7 @@ export function ImsLoginGate() {
             <label>Password<span className="imsPasswordWrap"><input name="password" autoComplete="current-password" type={showPassword ? "text" : "password"} value={password} onChange={e => updatePassword(e.target.value)} required placeholder="Your portal password" /><button type="button" onClick={() => setShowPassword(v => !v)} aria-label={showPassword ? "Hide password" : "Show password"}>{showPassword ? <EyeOff size={17}/> : <Eye size={17}/>}</button></span></label>
             <label className="imsRememberRow imsRememberCredentials">
               <input type="checkbox" checked={rememberCredentials} onChange={event => updateRememberCredentials(event.target.checked)} />
-              <span><b>Remember my IMS ID and password on this device</b><small>Saved in this browser; logging out erases them.</small></span>
+              <span><b>Remember my IMS password in this tab</b><small>ID stays on this device; the password is forgotten when the tab closes.</small></span>
             </label>
           </>}
           {captchaRequired && <>
@@ -549,6 +553,7 @@ export function ImsLoginGate() {
             </div>
             <input id="imsCaptchaInput" className="imsCaptchaInput" ref={captchaRef} value={captchaText} onChange={e => setCaptchaText(e.target.value)} required placeholder="Type the characters you see" autoComplete="off" autoCapitalize="off" autoCorrect="off" spellCheck={false} enterKeyHint="go" aria-describedby="imsCaptchaHint" />
             <small className="imsCaptchaHint" id="imsCaptchaHint">Wrong code? Only the image reloads — your details stay.</small>
+            <p className="imsCaptchaNote">This code is IMS&apos;s own — NsutNest never solves it. Enter it once and, while this tab stays open, IMS will not ask again for about 12 hours.</p>
           </>}
         </>}
         {error && <div className="imsGateError" role="alert">{error}</div>}

@@ -2,7 +2,8 @@
  * Offline checks for the IMS sign-in backend. Nothing here touches the portal, so
  * `npm run check:ims` is safe to run anywhere.
  *
- * Covered: the encoded-session cookie (round trip, rejection, size cap), the
+ * Covered: the session cookie (round trip, rejection, size cap, authenticated
+ * encryption when IMS_SESSION_SECRET is set), the
  * binding between a request body and its cookie, id rotation across the login
  * boundary, cookie flags, fixed-window rate limiting, and the user-facing error
  * copy for failed logins and upstream failures.
@@ -133,6 +134,17 @@ assert.match(expired.message, /expired/i, 'a dead session says so');
 const shaped = safeUpstreamError(new Error('The IMS portal returned an unexpected link. Refresh the CAPTCHA and try again.'));
 assert.equal(shaped.status, 502, 'a changed portal response is an upstream problem');
 
+const refusedPassword = safeUpstreamError(
+  new Error('IMS did not accept the IMS password, so the admit card could not be generated.'),
+);
+assert.equal(refusedPassword.status, 401, 'a refused password asks for a new sign-in, not a retry');
+assert.match(refusedPassword.message, /password/i, 'a refused password names the password');
+assert.equal(
+  safeUpstreamError(new Error('invalid password')).status,
+  401,
+  'a portal “invalid password” is the same case',
+);
+
 const unreachable = safeUpstreamError(new TypeError('fetch failed'));
 assert.equal(unreachable.status, 503, 'a dropped connection is reported as unavailable');
 assert.match(unreachable.message, /IMS/, 'the message names what could not be reached');
@@ -142,5 +154,23 @@ const unknown = safeUpstreamError(new Error('TypeError: cannot read properties o
 assert.equal(unknown.status, 502, 'an unexpected error is a bad gateway');
 assert.doesNotMatch(unknown.message, /TypeError|undefined/i, 'an unexpected error leaks no detail');
 assert.equal(safeUpstreamError('a string').status, 502, 'non-Error throwables are handled');
+
+// --- Sealed cookie (authenticated encryption) -----------------------------
+process.env.IMS_SESSION_SECRET = 'test-secret';
+const sealed = encodeImsSession({ ...baseSession(), id: 'session-sealed' });
+assert.match(sealed, /^v1\./, 'a configured key seals the cookie');
+assert.doesNotMatch(sealed, /session-sealed|JSESSIONID/, 'the sealed cookie hides the session id and portal cookies');
+assert.equal(readImsSession(sealed)?.cookies.JSESSIONID, 'abc', 'a sealed cookie round-trips');
+assert.equal(readImsSession(sealed)?.id, 'session-sealed', 'the sealed session id survives');
+assert.equal(
+  readImsSession(Buffer.from(JSON.stringify(baseSession())).toString('base64url')),
+  null,
+  'a hand-built plaintext token is refused once a key is set',
+);
+assert.equal(readImsSession(`${sealed.slice(0, -4)}AAAA`), null, 'a tampered sealed cookie is refused');
+process.env.IMS_SESSION_SECRET = 'another-secret';
+assert.equal(readImsSession(sealed), null, 'a cookie sealed with a different key is refused');
+delete process.env.IMS_SESSION_SECRET;
+assert.equal(readImsSession(encodeImsSession(baseSession()))?.id, 'session-1', 'without a key the readable format still works');
 
 console.log('All IMS auth checks passed.');

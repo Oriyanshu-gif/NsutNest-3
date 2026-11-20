@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createCipheriv, createDecipheriv, createHash, randomBytes, randomUUID } from 'node:crypto';
 import { load } from 'cheerio';
 import type { NextRequest, NextResponse } from 'next/server';
 
@@ -32,9 +32,60 @@ export type ImsHttpSession = {
 
 export type ImsHttpPage = { url: string; html: string };
 
+const SEALED_PREFIX = 'v1.';
+let warnedWithoutSecret = false;
+
+/**
+ * The cookie carries the student's live IMS cookies, so it is sealed with
+ * AES-256-GCM instead of being a readable, forgeable JSON blob. The key comes
+ * from IMS_SESSION_SECRET; without it the cookie falls back to the old readable
+ * format rather than locking every signed-in student out of a deploy.
+ */
+function sessionKey(): Buffer | null {
+  const secret = process.env.IMS_SESSION_SECRET;
+  if (secret) return createHash('sha256').update(secret).digest();
+  // shortcut: no secret means no authenticated encryption; set IMS_SESSION_SECRET.
+  if (process.env.NODE_ENV === 'production' && !warnedWithoutSecret) {
+    warnedWithoutSecret = true;
+    console.warn('[ims] IMS_SESSION_SECRET is not set; the IMS session cookie is not sealed.');
+  }
+  return null;
+}
+
+function seal(json: string): string | null {
+  const key = sessionKey();
+  if (!key) return null;
+  const iv = randomBytes(12);
+  const cipher = createCipheriv('aes-256-gcm', key, iv);
+  const body = Buffer.concat([cipher.update(json, 'utf8'), cipher.final()]);
+  return SEALED_PREFIX + Buffer.concat([iv, cipher.getAuthTag(), body]).toString('base64url');
+}
+
+function unseal(value: string): string | null {
+  const key = sessionKey();
+  if (!key) return null;
+  const raw = Buffer.from(value.slice(SEALED_PREFIX.length), 'base64url');
+  if (raw.length < 29) return null;
+  try {
+    const decipher = createDecipheriv('aes-256-gcm', key, raw.subarray(0, 12));
+    decipher.setAuthTag(raw.subarray(12, 28));
+    return Buffer.concat([decipher.update(raw.subarray(28)), decipher.final()]).toString('utf8');
+  } catch {
+    return null;
+  }
+}
+
 function decodeCookie(value: string): ImsHttpSession | null {
   try {
-    const session = JSON.parse(Buffer.from(value, 'base64url').toString('utf8')) as ImsHttpSession;
+    // With a key configured, only sealed tokens are trusted: a hand-written
+    // base64 blob must not be able to name its own session id or portal cookies.
+    const json = value.startsWith(SEALED_PREFIX)
+      ? unseal(value)
+      : sessionKey()
+        ? null
+        : Buffer.from(value, 'base64url').toString('utf8');
+    if (!json) return null;
+    const session = JSON.parse(json) as ImsHttpSession;
     if (!session.id || !session.cookies || !session.loginUrl || !['login', 'attendance'].includes(session.stage)) return null;
     return session;
   } catch {
@@ -67,7 +118,8 @@ export function clearImsSession<T extends NextResponse>(response: T): T {
 }
 
 export function encodeImsSession(session: ImsHttpSession): string {
-  const value = Buffer.from(JSON.stringify(session)).toString('base64url');
+  const json = JSON.stringify(session);
+  const value = seal(json) ?? Buffer.from(json).toString('base64url');
   if (value.length > 3500) throw new Error('The temporary IMS session is too large to store safely. Refresh the CAPTCHA and try again.');
   return value;
 }

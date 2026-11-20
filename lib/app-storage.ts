@@ -310,14 +310,15 @@ export function clearRememberedImsId(): void {
 /**
  * The IMS password, stored only when the student explicitly opts in.
  *
- * This is a plain-text credential in localStorage: readable by any script on
- * this origin and by anyone using the browser profile. It exists so a refresh
- * after the 20-minute IMS session lapses needs only a CAPTCHA, and it is wiped
- * on logout and whenever the checkbox is cleared.
+ * Kept in sessionStorage, not localStorage: it still prefills the next sign-in
+ * or admit-card refresh in this browser tab, but it no longer sits on disk for
+ * the next person at this machine (or any script on this origin) to read. Any
+ * copy an older build left in localStorage is deleted on sight.
  */
 export function readRememberedPassword(): string | null {
   try {
-    return store("local")?.getItem(REMEMBERED_PASSWORD_KEY) ?? null;
+    store("local")?.removeItem(REMEMBERED_PASSWORD_KEY);
+    return store("session")?.getItem(REMEMBERED_PASSWORD_KEY) ?? null;
   } catch {
     return null;
   }
@@ -325,7 +326,8 @@ export function readRememberedPassword(): string | null {
 
 export function writeRememberedPassword(value: string): void {
   try {
-    store("local")?.setItem(REMEMBERED_PASSWORD_KEY, value);
+    store("local")?.removeItem(REMEMBERED_PASSWORD_KEY);
+    store("session")?.setItem(REMEMBERED_PASSWORD_KEY, value);
   } catch {
     // Private-mode or full storage: the student still signs in, just without prefill.
   }
@@ -334,6 +336,7 @@ export function writeRememberedPassword(value: string): void {
 export function clearRememberedPassword(): void {
   try {
     store("local")?.removeItem(REMEMBERED_PASSWORD_KEY);
+    store("session")?.removeItem(REMEMBERED_PASSWORD_KEY);
   } catch {
     // Nothing stored means nothing to clear.
   }

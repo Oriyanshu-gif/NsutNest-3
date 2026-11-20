@@ -20,6 +20,14 @@ export function loginFailureMessage(portalMessage: string): string {
   return 'Sign-in failed. Check your ID, password and CAPTCHA, then try again.';
 }
 
+/**
+ * IMS refused the password itself. Nothing on our side can retry it: the portal
+ * has to see a fresh sign-in with the student's current password and a CAPTCHA,
+ * which is why this is reported as 401 and not as "try again in a minute".
+ */
+export const IMS_PASSWORD_REJECTED =
+  'IMS did not accept your IMS password. Enter your current password with the refreshed CAPTCHA and sign in again.';
+
 export type SafeUpstreamError = { message: string; status: number };
 
 /**
@@ -41,6 +49,9 @@ export function safeUpstreamError(
   // it gets its own message instead of "something went wrong".
   if (/fetch failed|ECONNRESET|ECONNREFUSED|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|socket hang up|network|getaddrinfo|ENETUNREACH/i.test(text)) {
     return { message: 'NSUT IMS could not be reached from the server. Try again in a few minutes.', status: 503 };
+  }
+  if (/did not accept (?:the )?(?:ims )?password|(?:invalid|incorrect|wrong).{0,20}password|password.{0,30}(?:not accepted|incorrect|invalid)/i.test(text)) {
+    return { message: IMS_PASSWORD_REJECTED, status: 401 };
   }
   // Checked before the expiry rule: these also tell the reader to refresh, but
   // they are portal-shape problems, not a dead session.

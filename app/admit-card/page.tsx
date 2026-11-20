@@ -13,8 +13,10 @@ import { imsFetch } from "../../lib/ims-client";
 import { useEffect, useRef, useState } from "react";
 import { AlertTriangle, FileText, Loader2, Printer, RefreshCw } from "lucide-react";
 import HubShell from "../hub-shell";
+import { IMS_PASSWORD_REJECTED } from "../../lib/ims-auth-errors";
 import {
   ATTENDANCE_SYNC_EVENT,
+  clearRememberedPassword,
   readRememberedPassword,
   readStoredAdmitCard,
   requestAttendanceRefresh,
@@ -34,8 +36,6 @@ function AdmitCardBody() {
   const [card, setCard] = useState<StoredAdmitCard | null>(null);
   /** The password saved at sign-in; null means this device has none yet. */
   const [secret, setSecret] = useState<string | null>(null);
-  /** Only used when this device has no saved sign-in to reuse. */
-  const [typed, setTyped] = useState("");
   const [busy, setBusy] = useState(false);
   const [waiting, setWaiting] = useState(false);
   /** A fresh card opens the print dialog by itself; a saved one waits for a click. */
@@ -63,19 +63,29 @@ function AdmitCardBody() {
         body: JSON.stringify({ password: pass }),
         cache: "no-store",
       });
-      if (response.status === 401) {
+      const body = await response.json() as Partial<StoredAdmitCard> & { error?: string; needsLogin?: boolean };
+      // No IMS session on this device yet (or it lapsed): the sign-in card is the
+      // only way forward, because only the student can read the CAPTCHA.
+      if (!response.ok && (response.status === 401 || body.needsLogin)) {
         attemptsRef.current += 1;
         if (attemptsRef.current > 2) {
-          setError("IMS did not accept the new session. Sign in from the dashboard, then generate again.");
+          setError("IMS did not accept the sign-in. Open the sign-in card, enter the CAPTCHA, then generate again.");
           setBusy(false);
           return;
         }
         setWaiting(true);
-        setNotice("Sign in to IMS and the admit card opens by itself.");
+        // A refused saved password cannot be retried, so forget it: the sign-in
+        // card then asks for the current one instead of replaying the stale copy.
+        if (body.error === IMS_PASSWORD_REJECTED) {
+          clearRememberedPassword();
+          setSecret("");
+          setError(body.error);
+        } else {
+          setNotice("Sign in to IMS and the admit card opens by itself.");
+        }
         requestAttendanceRefresh("print");
         return;
       }
-      const body = await response.json() as Partial<StoredAdmitCard> & { error?: string };
       if (!response.ok || !body.html) throw new Error(body.error || "Could not generate the admit card.");
       attemptsRef.current = 0;
       const next: StoredAdmitCard = {
@@ -168,6 +178,11 @@ function AdmitCardBody() {
             {error && <b>Admit card not generated</b>}
             <span>{error || notice}</span>
           </div>
+          {error && (
+            <div className="myProfileAlertActions">
+              <button type="button" onClick={() => requestAttendanceRefresh("print")}>Sign in</button>
+            </div>
+          )}
         </div>
       )}
 
@@ -220,39 +235,25 @@ function AdmitCardBody() {
         <div className="myProfileEmpty">
           <span className="myProfileEmptyIcon"><FileText size={30} /></span>
           <h2>Generate your admit card</h2>
-          <p>NSUT IMS issues the card for your current semester. Press the button and it appears here.</p>
+          <p>NSUT IMS issues the card for your current semester. Press the button and it appears here — if IMS asks for a fresh sign-in, the card opens by itself afterwards.</p>
           <button type="button" onClick={() => void generate(secret)}>Generate admit card</button>
         </div>
       )}
 
-      {/* No saved sign-in on this device: the one time the password is needed. */}
+      {/* No saved sign-in on this device. A password alone cannot help here: IMS
+          only hands over the card to a session the student created with a CAPTCHA,
+          so first-timers get the three steps instead of a dead-end field. */}
       {!card && !busy && !secret && (
-        <form
-          className="admitCardPassword"
-          onSubmit={(event) => {
-            event.preventDefault();
-            void generate(typed);
-          }}
-        >
-          <label htmlFor="admit-card-password">IMS password</label>
-          <input
-            id="admit-card-password"
-            type="password"
-            autoComplete="current-password"
-            value={typed}
-            onChange={(event) => setTyped(event.target.value)}
-            placeholder="Your IMS password"
-          />
-          <button className="myProfilePrintButton" type="submit" disabled={!typed.trim()}>
-            <FileText size={16} /> Generate admit card
-          </button>
-          <small>
-            This device has no saved IMS sign-in, so the card is generated once from your password. It is not stored — only the card is.{" "}
-            <button type="button" className="admitCardInlineLink" onClick={() => requestAttendanceRefresh("print")}>
-              Sign in instead
-            </button>
-          </small>
-        </form>
+        <div className="myProfileEmpty">
+          <span className="myProfileEmptyIcon"><FileText size={30} /></span>
+          <h2>First time? One IMS sign-in and the card is yours</h2>
+          <ol className="admitCardSteps">
+            <li>Sign in with your IMS roll number and password, then type the CAPTCHA IMS shows.</li>
+            <li>The card generates by itself and opens the print dialog — pick <b>Save as PDF</b>.</li>
+            <li>It is saved on this device, so it opens again later without another sign-in.</li>
+          </ol>
+          <button type="button" onClick={() => requestAttendanceRefresh("print")}>Sign in to IMS</button>
+        </div>
       )}
     </div>
   );
