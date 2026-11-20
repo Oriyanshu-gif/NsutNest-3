@@ -10,7 +10,7 @@
  * counter. Attendance, profile and read state are already kept deliberately in
  * localStorage by the app, not here.
  */
-const VERSION = "nsut-nest-v4";
+const VERSION = "nsut-nest-v2";
 const STATIC_CACHE = `${VERSION}-static`;
 const DATA_CACHE = `${VERSION}-data`;
 const PAGE_CACHE = `${VERSION}-pages`;

@@ -11,7 +11,6 @@
  * another, so a reload does not count the same person twice.
  */
 
-import { apiUrl } from "../lib/api-base";
 import { useEffect, useState } from "react";
 import { Users } from "lucide-react";
 import { LIVE_VIEW_CLIENT_ID_KEY } from "../lib/app-storage";
@@ -78,7 +77,7 @@ export function useLiveViewCount(): number | null {
 
     async function refresh(register = false) {
       try {
-        const res = await fetch(apiUrl("/api/live-views"), {
+        const res = await fetch("/api/live-views", {
           method: register ? "POST" : "GET",
           ...(register ? {
             headers: { "content-type": "application/json" },
@@ -102,7 +101,7 @@ export function useLiveViewCount(): number | null {
     try { register = window.sessionStorage.getItem(SESSION_KEY) !== "1"; } catch {}
     async function initialRefresh() {
       try {
-        const res = await fetch(apiUrl("/api/live-views"), {
+        const res = await fetch("/api/live-views", {
           method: register ? "POST" : "GET",
           headers: register ? { "content-type": "application/json" } : undefined,
           body: register ? JSON.stringify({ clientId, registerVisit: true }) : undefined,

@@ -13,7 +13,6 @@
  * state; clearing site data resets it.
  */
 
-import { apiUrl } from "./api-base";
 import { useEffect, useSyncExternalStore } from "react";
 
 export type Notice = {
@@ -131,7 +130,7 @@ export async function refreshNotices(): Promise<void> {
   publish({ loading: true });
   inFlight = (async () => {
     try {
-      const response = await fetch(apiUrl("/api/notices"), { cache: "no-store" });
+      const response = await fetch("/api/notices", { cache: "no-store" });
       const body = (await response.json().catch(() => ({}))) as Partial<NoticePayload> & { error?: string };
       if (!response.ok) throw new Error(body.error || `The notice board answered HTTP ${response.status}.`);
       if (!Array.isArray(body.notices)) throw new Error("The notice board returned an unexpected response.");

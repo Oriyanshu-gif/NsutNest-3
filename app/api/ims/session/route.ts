@@ -2,13 +2,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { randomUUID } from 'node:crypto';
 import { load } from 'cheerio';
 import {
+  encodeImsSession,
   IMS_BASE_URL,
+  IMS_COOKIE_NAME,
   IMS_SESSION_SECONDS,
+  imsCookieOptions,
   pageForms,
   requestIms,
   requestImsImage,
   type ImsHttpSession,
-  setImsSession,
 } from '../../../../lib/ims-http';
 import { safeUpstreamError } from '../../../../lib/ims-auth-errors';
 import { rateLimit, requestKey } from '../../../../lib/rate-limit';
@@ -117,7 +119,7 @@ export async function POST(request: NextRequest) {
       // could be wired in later without touching the UI.
       captchaRequired: true,
     }, { headers: { 'Cache-Control': 'no-store' } });
-    setImsSession(response, session);
+    response.cookies.set(IMS_COOKIE_NAME, encodeImsSession(session), imsCookieOptions());
     return response;
   } catch (error) {
     // Portal detail stays on the server; the browser gets something actionable.

@@ -1,6 +1,5 @@
 "use client";
 
-import { imsFetch } from "../../lib/ims-client";
 /**
  * My Profile — the read-only IMS student profile, fetched with the same
  * authenticated session as attendance.
@@ -11,7 +10,6 @@ import { imsFetch } from "../../lib/ims-client";
  * clean A4 sheet without the app chrome.
  */
 
-import { apiUrl } from "../../lib/api-base";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, Loader2, Printer, UserRound } from "lucide-react";
 import HubShell from "../hub-shell";
@@ -84,7 +82,7 @@ function MyProfileBody() {
     setLoading(true);
     setError("");
 
-    imsFetch("/api/ims/profile", { cache: "no-store" })
+    fetch("/api/ims/profile", { cache: "no-store" })
       .then(async response => {
         const body = await response.json() as StoredImsProfile & { error?: string };
         if (!response.ok) throw new Error(body.error || "Could not load your IMS profile.");
@@ -164,7 +162,7 @@ function MyProfileBody() {
     // fires its print again.
     setPrintHtml("");
     try {
-      const response = await imsFetch("/api/ims/profile/print", { cache: "no-store" });
+      const response = await fetch("/api/ims/profile/print", { cache: "no-store" });
       if (response.status === 401) {
         printAttemptsRef.current += 1;
         if (printAttemptsRef.current > 2) {

@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { load } from 'cheerio';
 import {
+  encodeImsSession,
   findLink,
+  IMS_COOKIE_NAME,
+  imsCookieOptions,
   pageText,
   readImsFrames,
   readImsSession,
@@ -10,8 +13,6 @@ import {
   sessionMatchesId,
   type ImsHttpPage,
   type ImsHttpSession,
-  clearImsSession,
-  readImsSessionFrom,
 } from '../../../../lib/ims-http';
 import { loginFailureMessage, safeUpstreamError } from '../../../../lib/ims-auth-errors';
 import { rateLimit, requestKey } from '../../../../lib/rate-limit';
@@ -124,7 +125,6 @@ async function navigateAfterLogin(session: ImsHttpSession, loginResponse: ImsHtt
   rememberProfileLink(session, [{ url: loginResponse.url, html: loginResponse.html }, ...pages]);
   const activities = findLink(pages, /^My Activities$/i);
   if (!activities) throw new Error('Login succeeded, but the IMS My Activities link was not found in its returned pages.');
-  session.activitiesUrl = activities.url;
 
   const activitiesPage = await requestIms(session, activities.url, { referer: activities.page.url });
   // Fast path: My Attendance link is often directly on activitiesPage without needing to crawl its subframes
@@ -169,7 +169,7 @@ export async function POST(request: NextRequest) {
     confirmChoices?: boolean;
   };
   try { body = await request.json(); } catch { return NextResponse.json({ error: 'Invalid request.' }, { status: 400 }); }
-  const session = readImsSessionFrom(request);
+  const session = readImsSession(request.cookies.get(IMS_COOKIE_NAME)?.value);
   // Binding the body to the cookie's random session id stops a request from
   // driving someone else's half-finished login.
   if (!sessionMatchesId(session, body.sessionId)) {
@@ -209,7 +209,7 @@ export async function POST(request: NextRequest) {
           .join(' ');
         const message = loginFailureMessage(errorText);
         const response = NextResponse.json({ error: message }, { status: 401, headers: { 'Cache-Control': 'no-store' } });
-        clearImsSession(response);
+        response.cookies.set(IMS_COOKIE_NAME, '', { ...imsCookieOptions(), maxAge: 0 });
         return response;
       }
 
@@ -275,7 +275,7 @@ export async function POST(request: NextRequest) {
     const response = NextResponse.json({
       error: safe.message,
     }, { status: safe.status, headers: { 'Cache-Control': 'no-store' } });
-    clearImsSession(response);
+    response.cookies.set(IMS_COOKIE_NAME, '', { ...imsCookieOptions(), maxAge: 0 });
     return response;
   }
 }

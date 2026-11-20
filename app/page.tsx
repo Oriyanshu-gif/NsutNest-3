@@ -1,42 +1,47 @@
 "use client";
 
-import { imsFetch } from "../lib/ims-client";
 /**
- * NSUT Nest home — the paper PWA layout.
+ * NsutNest dashboard.
  *
- * Content order follows the attached PWA mockup: greeting, next-exam hero,
- * today's classes, notices and the exam schedule. The 75% attendance view has
- * its own tab (`app/attendance`). Every value still comes from the saved IMS
- * attendance, the cached timetable, the COE date sheet or the live notice
- * board — no fabricated percentages or exam dates.
+ * Order: greeting + identity, a data-driven "needs attention" strip, four metric
+ * cards, the personalised exam date sheet, attendance beside notices, then campus spots.
+ *
+ * Every figure is read from data already on this device (IMS attendance), the
+ * published results dataset, the COE date sheet, or the live notice board. There
+ * are no estimated percentages and no fabricated exam dates.
  */
 
-import { apiUrl } from "../lib/api-base";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   Activity,
   AlertTriangle,
+  ArrowDownUp,
   ArrowUpRight,
-  Bell,
   BellRing,
   CalendarDays,
-  CalendarPlus,
   ChevronRight,
   Clock,
+  ExternalLink,
+  GraduationCap,
+  Loader2,
+  MapPin,
+  Minus,
+  Plus,
   Printer,
   RefreshCw,
-  ShieldCheck,
+  TrendingUp,
+  X,
 } from "lucide-react";
+import { loadStudents, type Student } from "../lib/data";
+import { withResolvedSubjectNames } from "../lib/attendance";
 import {
   ATTENDANCE_REFRESH_STATUS_EVENT,
   ATTENDANCE_SYNC_EVENT,
   PROFILE_SYNC_EVENT,
   readStoredAttendance,
   readStoredProfile,
-  readStoredTimetable,
   requestAttendanceRefresh,
-  writeStoredTimetable,
 } from "../lib/app-storage";
 import {
   refreshNotices,
@@ -49,20 +54,26 @@ import {
   loadDatesheet,
   matchStudentExams,
   type DatesheetPayload,
-  type ExamScheduleItem,
 } from "../lib/datesheet";
-import { downloadExamCalendar } from "../lib/exam-calendar";
-import type { TimetableEntry, TimetablePayload } from "../lib/ims-timetable";
-import { withResolvedSubjectNames } from "../lib/attendance";
 import HubShell from "./app-shell";
-import { SubjectSheet } from "./subject-sheet";
-import { TodoList } from "./todo-list";
+import { SubjectAttendanceCalendar } from "./attendance-calendar";
 import {
   attendanceTone,
   OfflineBanner,
   Skeleton,
+  StatusChip,
   useOnlineStatus,
 } from "./ui";
+
+type SubjectRow = {
+  title: string;
+  code: string;
+  attended: number;
+  held: number;
+  percent: number;
+  canSkip: number;
+  mustAttend: number;
+};
 
 type LiveAttendancePayload = {
   name: string;
@@ -77,74 +88,144 @@ type LiveAttendancePayload = {
   syncedAt: string;
 };
 
-const IST_TIME_ZONE = "Asia/Kolkata";
-const IST_DAY_NAMES: Record<string, string> = {
-  Mon: "Monday",
-  Tue: "Tuesday",
-  Wed: "Wednesday",
-  Thu: "Thursday",
-  Fri: "Friday",
-  Sat: "Saturday",
-  Sun: "Sunday",
-};
+const POLICY = 75;
 
-function istNow(date = new Date()): {
-  day: string;
-  dayLong: string;
-  minutes: number;
-  fullLabel: string;
-} {
-  const parts = new Intl.DateTimeFormat("en-GB", {
-    timeZone: IST_TIME_ZONE,
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-  }).formatToParts(date);
-  const get = (type: string) => parts.find((part) => part.type === type)?.value ?? "";
-  const day = get("weekday").slice(0, 3);
-  return {
-    day,
-    dayLong: IST_DAY_NAMES[day] ?? day,
-    minutes: Number(get("hour")) * 60 + Number(get("minute")),
-    fullLabel: `${get("weekday")}, ${get("day")} ${get("month")} ${get("year")}`,
-  };
-}
+const SHARED_HANGOUTS = [
+  { name: "Grover Sweets", place: "Sweets & snacks", url: "https://share.google/QWKzCOF5mPXxIsLR8", img: "https://images.unsplash.com/photo-1601050690597-df0568f70950?auto=format&fit=crop&w=900&q=80", alt: "Indian sweets and snacks" },
+  { name: "Nescafé – NSUT Delhi", place: "Coffee & café", url: "https://share.google/3VLepXCwTjoKprx1q", img: "/images/hangouts/nescafe-nsut.png", alt: "Nescafé café at NSUT, photo supplied by the user" },
+  { name: "Mehfil Restaurant", place: "New Delhi · Restaurant", url: "https://share.google/qwWGaFPImDuVKFjgm", img: "/images/hangouts/mehfil-restaurant.png", alt: "Mehfil Restaurant signboard, photo supplied by the user" },
+] as const;
 
-function greetingForMinutes(minutes: number): string {
-  if (minutes < 5 * 60) return "Up late";
-  if (minutes < 12 * 60) return "Good morning";
-  if (minutes < 17 * 60) return "Good afternoon";
+const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+function greeting(date: Date): string {
+  const hour = date.getHours();
+  if (hour < 5) return "Up late";
+  if (hour < 12) return "Good morning";
+  if (hour < 17) return "Good afternoon";
   return "Good evening";
 }
 
-function clock12(minutes: number, withSuffix = true): string {
-  const hour = Math.floor(minutes / 60) % 24;
-  const minute = String(minutes % 60).padStart(2, "0");
-  const suffix = hour < 12 ? "am" : "pm";
-  return `${hour % 12 || 12}:${minute}${withSuffix ? ` ${suffix}` : ""}`;
+function subjectAttendanceMonths(daily: LiveAttendancePayload["daily"], code: string): string[] {
+  return Array.from(
+    new Set(
+      (daily ?? [])
+        .filter((day) => day.values[code] && /^\d{4}-\d{2}-\d{2}$/.test(day.date))
+        .map((day) => day.date.slice(0, 7)),
+    ),
+  ).sort();
 }
 
-function formatTimeRange(start: number, end: number): string {
-  const startSuffix = start < 12 * 60 ? "am" : "pm";
-  const endSuffix = end < 12 * 60 ? "am" : "pm";
-  return startSuffix === endSuffix
-    ? `${clock12(start, false)}–${clock12(end, true)}`
-    : `${clock12(start, true)}–${clock12(end, true)}`;
+/** Classes that can still be missed while staying at or above 75%. */
+function skipBudget(attended: number, held: number): number {
+  return held > 0 ? Math.max(0, Math.floor(attended / (POLICY / 100) - held)) : 0;
 }
 
-function entryMeta(entry: TimetableEntry): string {
-  return [
-    entry.code,
-    entry.room,
-    entry.group ? `Group ${entry.group}` : null,
-    entry.tutorial ? `Tutorial ${entry.tutorial}` : null,
-    entry.batch ? `Batch ${entry.batch}` : null,
-    entry.section ? `Sec ${entry.section}` : null,
-  ].filter(Boolean).join(" · ");
+/** Consecutive classes needed to climb back to 75%. */
+function attendBudget(attended: number, held: number): number {
+  return held > 0 ? Math.max(0, Math.ceil((POLICY / 100) * held - attended) / (1 - POLICY / 100)) : 0;
+}
+
+function actionLine(row: SubjectRow, tone: ReturnType<typeof attendanceTone>): string {
+  if (tone === "none") return "No classes held yet";
+  if (row.percent < POLICY) return `Attend ${Math.ceil(attendBudget(row.attended, row.held))} consecutive classes to reach 75%`;
+  if (tone === "borderline") return `Can miss ${skipBudget(row.attended, row.held)} more classes. You are right at the 75% line.`;
+  return `Can miss ${skipBudget(row.attended, row.held)} more classes and stay at 75%`;
+}
+
+/* ---------- Circular gauge with a visible 75% marker ---------- */
+function Gauge({ percent }: { percent: number }) {
+  const clamped = Math.max(0, Math.min(100, percent));
+  const radius = 52;
+  const circumference = 2 * Math.PI * radius;
+  const dash = (clamped / 100) * circumference;
+  const good = clamped >= POLICY;
+
+  return (
+    <div className="gauge">
+      <svg viewBox="0 0 120 120" width="132" height="132" role="img" aria-label={`Overall attendance ${clamped.toFixed(1)} percent, 75 percent minimum`}>
+        <circle cx="60" cy="60" r={radius} fill="none" className="gaugeTrack" strokeWidth="11" />
+        <circle
+          cx="60"
+          cy="60"
+          r={radius}
+          fill="none"
+          className={`gaugeArcLine ${good ? "good" : "low"}`}
+          strokeWidth="11"
+          strokeLinecap="round"
+          strokeDasharray={`${dash} ${circumference - dash}`}
+          transform="rotate(-90 60 60)"
+        />
+        {/* 75% sits exactly at the left of the ring. */}
+        <line x1="3" y1="60" x2="15" y2="60" className="gaugeTick" strokeWidth="3" strokeLinecap="round" />
+      </svg>
+      <div className="gaugeCenter">
+        <b>{clamped.toFixed(1)}%</b>
+        <small>overall</small>
+      </div>
+    </div>
+  );
+}
+
+function SkipEstimator({ subject }: { subject: SubjectRow }) {
+  const [mode, setMode] = useState<"miss" | "attend">("miss");
+  const [count, setCount] = useState(0);
+  const isAttend = mode === "attend";
+  const projected = isAttend
+    ? ((subject.attended + count) / (subject.held + count)) * 100
+    : (subject.attended / (subject.held + count)) * 100;
+  const below = projected < POLICY;
+
+  return (
+    <div className="skipEstimator">
+      <div className="skipHead">
+        <div className="skipHeadText">
+          <span className="skipTitle">What if…</span>
+          <small className="skipSub">Project your attendance</small>
+        </div>
+        <span className="skipTag">Estimate</span>
+      </div>
+      <div className="skipModes" role="group" aria-label="Choose an attendance scenario">
+        <button
+          type="button"
+          className={!isAttend ? "active" : ""}
+          aria-pressed={!isAttend}
+          onClick={() => setMode("miss")}
+        >
+          I miss classes
+        </button>
+        <button
+          type="button"
+          className={isAttend ? "active" : ""}
+          aria-pressed={isAttend}
+          onClick={() => setMode("attend")}
+        >
+          I attend classes
+        </button>
+      </div>
+      <div className="skipBody">
+        <div className="skipStepper" role="group" aria-label={`Number of classes to ${isAttend ? "attend" : "miss"}`}>
+          <button type="button" onClick={() => setCount((value) => Math.max(0, value - 1))} disabled={count === 0} aria-label={`${isAttend ? "Attend" : "Miss"} one fewer class`}>
+            <Minus size={16} aria-hidden="true" />
+          </button>
+          <span className="skipValue"><b>{count}</b><small>class{count === 1 ? "" : "es"}</small></span>
+          <button type="button" onClick={() => setCount((value) => Math.min(20, value + 1))} disabled={count >= 20} aria-label={`${isAttend ? "Attend" : "Miss"} one more class`}>
+            <Plus size={16} aria-hidden="true" />
+          </button>
+        </div>
+        <p className="skipResult" aria-live="polite">
+          Projected <b className={below ? "low" : ""}>{projected.toFixed(1)}%</b>
+          <span className={`skipVerdict ${below ? "low" : "good"}`}>{below ? "Below 75%" : "Above 75%"}</span>
+        </p>
+      </div>
+      <small className="skipNote">
+        {isAttend
+          ? "Assumes those future classes are held and you attend every one."
+          : "Assumes those future classes are held and you miss every one."}
+      </small>
+    </div>
+  );
 }
 
 export default function Overview() {
@@ -158,23 +239,23 @@ export default function Overview() {
 function OverviewBody() {
   const noticeStore = useNoticeStore();
   const online = useOnlineStatus();
+  const [students, setStudents] = useState<Student[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [liveAttendance, setLiveAttendance] = useState<LiveAttendancePayload | null>(null);
   const [attendanceReady, setAttendanceReady] = useState(false);
   const [profileName, setProfileName] = useState("");
-  const [profilePhoto, setProfilePhoto] = useState<string | null>(null);
   const [attendanceRefreshing, setAttendanceRefreshing] = useState(false);
   const [retryingNotices, setRetryingNotices] = useState(false);
+  const [selectedAttendanceSubject, setSelectedAttendanceSubject] = useState<string | null>(null);
+  const [attendanceCalendarMonth, setAttendanceCalendarMonth] = useState("");
+  const [sortByRisk, setSortByRisk] = useState(true);
+  const [campusMapOpen, setCampusMapOpen] = useState(false);
+  const [greetingText, setGreetingText] = useState("Welcome");
+  const [dateLine, setDateLine] = useState("");
   const [datesheet, setDatesheet] = useState<DatesheetPayload | null>(null);
-  const [timetable, setTimetable] = useState<TimetablePayload | null>(null);
-  const [timetableLoading, setTimetableLoading] = useState(false);
-  const [timetableError, setTimetableError] = useState("");
-  const [timetableRequest, setTimetableRequest] = useState(0);
-  const [campusClock, setCampusClock] = useState<ReturnType<typeof istNow> | null>(null);
-  const forceTimetableRefresh = useRef(false);
-  const [sheetCode, setSheetCode] = useState<string | null>(null);
 
   useEffect(() => {
-    const onStatus = (event: Event) => setAttendanceRefreshing(Boolean((event as CustomEvent<boolean>).detail));
+    const onStatus = (event: Event) => setAttendanceRefreshing((event as CustomEvent<boolean>).detail);
     window.addEventListener(ATTENDANCE_REFRESH_STATUS_EVENT, onStatus);
     return () => window.removeEventListener(ATTENDANCE_REFRESH_STATUS_EVENT, onStatus);
   }, []);
@@ -186,7 +267,7 @@ function OverviewBody() {
         if (active) setDatesheet(payload);
       })
       .catch(() => {
-        // The exam section stays empty; attendance, classes and notices still render.
+        // The schedule simply stays unset; attendance and notices still render.
       });
     return () => {
       active = false;
@@ -194,10 +275,9 @@ function OverviewBody() {
   }, []);
 
   useEffect(() => {
-    const tick = () => setCampusClock(istNow());
-    tick();
-    const timer = window.setInterval(tick, 30_000);
-    return () => window.clearInterval(timer);
+    const now = new Date();
+    setGreetingText(greeting(now));
+    setDateLine(`${WEEKDAYS[now.getDay()]}, ${now.getDate()} ${MONTHS[now.getMonth()]} ${now.getFullYear()}`);
   }, []);
 
   useEffect(() => {
@@ -205,9 +285,8 @@ function OverviewBody() {
       try {
         const profile = readStoredProfile();
         if (profile) {
-          const parsedProfile = JSON.parse(profile) as { name?: string; photo?: string | null };
+          const parsedProfile = JSON.parse(profile) as { name?: string };
           setProfileName(parsedProfile.name?.trim() ?? "");
-          setProfilePhoto(parsedProfile.photo ?? null);
         }
         const cached = readStoredAttendance();
         const parsed = cached ? (JSON.parse(cached) as LiveAttendancePayload) : null;
@@ -233,72 +312,75 @@ function OverviewBody() {
   }, []);
 
   useEffect(() => {
-    const roll = liveAttendance?.roll?.trim();
-    if (!roll) {
-      setTimetable(null);
-      setTimetableError("");
-      setTimetableLoading(false);
-      return;
-    }
-
-    const force = forceTimetableRefresh.current;
-    forceTimetableRefresh.current = false;
     let active = true;
-    let cached: TimetablePayload | null = null;
-
-    try {
-      const raw = readStoredTimetable();
-      if (raw) {
-        const parsed = JSON.parse(raw) as TimetablePayload;
-        if (parsed?.roll?.toUpperCase() === roll.toUpperCase() && Array.isArray(parsed.slots)) {
-          cached = parsed;
-          setTimetable(parsed);
-          const fetched = new Date(parsed.fetchedAt).getTime();
-          if (!force && Number.isFinite(fetched) && Date.now() - fetched < 6 * 60 * 60 * 1000) {
-            setTimetableError("");
-            setTimetableLoading(false);
-            return;
-          }
-        }
-      }
-    } catch {
-      // A corrupt cache is treated like no cache.
-    }
-
-    if (!cached) setTimetable(null);
-    setTimetableError("");
-    setTimetableLoading(true);
-
-    imsFetch("/api/ims/timetable", { cache: "no-store" })
-      .then(async (response) => {
-        const body = (await response.json().catch(() => ({}))) as TimetablePayload & { error?: string };
-        if (!response.ok) throw new Error(body.error || "Could not load your IMS timetable.");
-        if (!Array.isArray(body.slots)) throw new Error("IMS returned an empty timetable.");
-        if (body.roll && body.roll.trim().toUpperCase() !== roll.toUpperCase()) {
-          throw new Error("IMS returned a timetable for a different account.");
-        }
-        return { ...body, fetchedAt: body.fetchedAt || new Date().toISOString() };
-      })
-      .then((payload) => {
-        if (!active) return;
-        writeStoredTimetable(JSON.stringify(payload));
-        setTimetable(payload);
-        setTimetableError("");
-      })
-      .catch((failure) => {
-        if (active) setTimetableError(failure instanceof Error ? failure.message : "Could not load your IMS timetable.");
-      })
-      .finally(() => {
-        if (active) setTimetableLoading(false);
-      });
-
+    loadStudents().then(
+      (rows) => active && setStudents(rows),
+      (failure) => active && setError(failure instanceof Error ? failure.message : "Could not load results data."),
+    );
     return () => {
       active = false;
     };
-  }, [liveAttendance?.roll, liveAttendance?.syncedAt, timetableRequest]);
+  }, []);
+
+  const me = useMemo<Student | null>(() => {
+    const roll = liveAttendance?.roll.trim().toUpperCase();
+    if (!students?.length || !roll) return null;
+    return students
+      .filter((student) => student.roll.trim().toUpperCase() === roll)
+      .reduce<Student | null>((latest, student) => {
+        if (!latest || student.ay > latest.ay || (student.ay === latest.ay && student.semester > latest.semester)) return student;
+        return latest;
+      }, null);
+  }, [students, liveAttendance?.roll]);
+
+  const subjectRows = useMemo<SubjectRow[]>(
+    () =>
+      liveAttendance?.subjects?.map((subject) => ({
+        title: subject.name || subject.code,
+        code: subject.code,
+        attended: subject.present,
+        held: subject.held,
+        percent: subject.percent,
+        canSkip: subject.canSkip,
+        mustAttend: subject.mustAttend,
+      })) ?? [],
+    [liveAttendance],
+  );
+
+  const attendedTotal = subjectRows.reduce((total, row) => total + (row.held ? row.attended : 0), 0);
+  const heldTotal = subjectRows.reduce((total, row) => total + (row.held ? row.held : 0), 0);
+  const overall = heldTotal ? (attendedTotal / heldTotal) * 100 : 0;
+
+  const needsAttention = useMemo(
+    () =>
+      subjectRows
+        .filter((row) => {
+          const tone = attendanceTone(row.percent, row.held);
+          return tone === "risk" || tone === "borderline";
+        })
+        .sort((a, b) => a.percent - b.percent),
+    [subjectRows],
+  );
+  const atRiskCount = needsAttention.filter((row) => row.percent < POLICY).length;
+  const borderlineCount = needsAttention.length - atRiskCount;
+
+  const orderedRows = useMemo(() => {
+    if (!sortByRisk) return subjectRows;
+    const rank = { risk: 0, borderline: 1, safe: 2, none: 3 } as const;
+    return [...subjectRows].sort((a, b) => {
+      const toneA = attendanceTone(a.percent, a.held);
+      const toneB = attendanceTone(b.percent, b.held);
+      return rank[toneA] - rank[toneB] || a.percent - b.percent;
+    });
+  }, [subjectRows, sortByRisk]);
+
 
   const notices = noticeStore.payload?.notices ?? [];
-  const noticesPreview = notices.slice(0, 3);
+  const noticesPreview = notices.slice(0, 4);
+  const newThisWeek = useMemo(() => {
+    const week = new Date(Date.now() - 7 * 86_400_000).toISOString().slice(0, 10);
+    return notices.filter((notice) => notice.isoDate >= week).length;
+  }, [notices]);
   const noticesUsingCache = noticeStore.usingCache || (!online && Boolean(noticeStore.payload));
 
   const studentExams = useMemo(() => {
@@ -310,38 +392,51 @@ function OverviewBody() {
     );
   }, [datesheet, liveAttendance]);
 
-  const nextExam = useMemo<ExamScheduleItem | null>(() => {
+  const nextExam = useMemo(() => {
     const now = new Date();
-    return studentExams.find((exam) => {
-      const { status } = getExamCountdown(exam.isoDate, now);
-      return status === "today" || status === "upcoming";
-    }) ?? null;
+    return (
+      studentExams.find((exam) => {
+        const { status } = getExamCountdown(exam.isoDate, now);
+        return status === "today" || status === "upcoming";
+      }) ?? null
+    );
   }, [studentExams]);
 
   const laterExams = nextExam ? studentExams.filter((exam) => exam.code !== nextExam.code) : studentExams;
   const nextCountdown = nextExam ? getExamCountdown(nextExam.isoDate) : null;
 
-  const timetableToday = useMemo(() => {
-    if (!timetable || !campusClock) return [];
-    return timetable.slots.filter((slot) => slot.day === campusClock.day);
-  }, [timetable, campusClock]);
+  const summaryLine = useMemo(() => {
+    if (nextExam && nextCountdown) {
+      const when = nextCountdown.status === "today"
+        ? "today"
+        : `in ${nextCountdown.daysRemaining} day${nextCountdown.daysRemaining === 1 ? "" : "s"}`;
+      if (needsAttention.length) {
+        return `Your next exam is ${when} and ${needsAttention.length} subject${needsAttention.length === 1 ? "" : "s"} need attention.`;
+      }
+      return `Your next exam is ${when}. Attendance is above the 75% line.`;
+    }
+    if (needsAttention.length) {
+      const base = `${atRiskCount} subject${atRiskCount === 1 ? " is" : "s are"} below the 75% line`;
+      return borderlineCount
+        ? `${base} and ${borderlineCount} more ${borderlineCount === 1 ? "is" : "are"} close to it.`
+        : `${base}.`;
+    }
+    if (heldTotal) return "Every subject is above the 75% attendance line.";
+    return "Sign in with NSUT IMS to see attendance, exam dates and notices.";
+  }, [nextExam, nextCountdown, needsAttention.length, atRiskCount, borderlineCount, heldTotal]);
 
-  const timetableCurrent = useMemo(() => {
-    if (!campusClock) return [];
-    return timetableToday.filter((slot) => campusClock.minutes >= slot.startMinutes && campusClock.minutes < slot.endMinutes);
-  }, [timetableToday, campusClock]);
+  if (error) {
+    return (
+      <div className="empty">
+        <AlertTriangle size={30} />
+        <h3>Could not load the dashboard</h3>
+        <p>{error}</p>
+      </div>
+    );
+  }
 
-  const timetableNext = useMemo(() => {
-    if (!campusClock) return null;
-    return timetableToday.find((slot) => slot.startMinutes > campusClock.minutes) ?? null;
-  }, [timetableToday, campusClock]);
-
-  const timetableNeedsIms = !liveAttendance || /sign in|session|expired/i.test(timetableError);
-  const subjectNames = useMemo(
-    () => new Map((liveAttendance?.subjects ?? []).map((subject) => [subject.code.toUpperCase(), subject.name])),
-    [liveAttendance],
-  );
-
+  const attendanceFresh =
+    !!liveAttendance && Date.now() - new Date(liveAttendance.syncedAt).getTime() < 6 * 60 * 60 * 1000;
   const rawName = (liveAttendance?.name || profileName).trim();
   const firstName = rawName
     ? rawName
@@ -349,20 +444,7 @@ function OverviewBody() {
         .replace(/(^|[\s-])([a-z])/g, (_, lead: string, letter: string) => `${lead}${letter.toUpperCase()}`)
         .split(/\s+/)[0]
     : "";
-  const initials = rawName
-    ? rawName.split(/\s+/).filter(Boolean).map((part) => part[0]).join("").slice(0, 2).toUpperCase()
-    : "S";
-  const greetingText = campusClock ? greetingForMinutes(campusClock.minutes) : "Welcome";
-  const attendanceFresh = !!liveAttendance && Date.now() - new Date(liveAttendance.syncedAt).getTime() < 6 * 60 * 60 * 1000;
-  // The dashboard keeps only the headline: who is at risk, the rest lives on /attendance.
-  const atRiskRows = (liveAttendance?.subjects ?? [])
-    .filter((subject) => subject.held > 0 && subject.percent < 75)
-    .sort((a, b) => a.percent - b.percent);
-  // Volumes come from the same saved snapshot the attendance tab reads.
-  const sheetSubject = liveAttendance?.subjects?.find((subject) => subject.code === sheetCode) ?? null;
-  const timetableSynced = timetable?.fetchedAt
-    ? new Date(timetable.fetchedAt).toLocaleTimeString("en-IN", { timeZone: IST_TIME_ZONE, hour: "2-digit", minute: "2-digit" })
-    : "";
+  const latestSgpa = me?.sgpa ?? null;
 
   async function retryNotices() {
     if (retryingNotices) return;
@@ -374,13 +456,52 @@ function OverviewBody() {
     }
   }
 
-  function refreshTimetable() {
-    if (timetableNeedsIms) {
-      requestAttendanceRefresh();
-      return;
+  function renderNoticePreview() {
+    if (noticeStore.error && !noticeStore.payload) {
+      return (
+        <div className="attEmpty">
+          <AlertTriangle size={24} />
+          <p>{noticeStore.error}</p>
+          <button className="ntSecondary" type="button" onClick={retryNotices} disabled={retryingNotices}>
+            <RefreshCw size={13} className={retryingNotices ? "attSpinIcon" : ""} /> Retry
+          </button>
+        </div>
+      );
     }
-    forceTimetableRefresh.current = true;
-    setTimetableRequest((value) => value + 1);
+    if (!noticeStore.payload) {
+      return <Skeleton rows={4} />;
+    }
+    if (!noticesPreview.length) {
+      return (
+        <div className="attEmpty">
+          <BellRing size={24} />
+          <p>No notices on the board right now.</p>
+        </div>
+      );
+    }
+    return (
+      <div className="hubNoticeList">
+        {noticesPreview.map((notice) => (
+          <a
+            className="hubNoticeRow"
+            key={`${notice.isoDate}-${notice.title}`}
+            href={notice.href}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label={`Open PDF: ${notice.title}`}
+          >
+            <span className="hubNoticeText">
+              <h4>{notice.title}</h4>
+              <p>
+                {notice.department || "NSUT"} ·{" "}
+                <time dateTime={notice.isoDate}>{relativeNoticeDate(notice.isoDate)}</time>
+              </p>
+            </span>
+            <ExternalLink size={16} className="hubNoticeChev" aria-hidden="true" />
+          </a>
+        ))}
+      </div>
+    );
   }
 
   return (
@@ -393,346 +514,431 @@ function OverviewBody() {
         />
       )}
 
-      <div className="nestHome">
-        <header className="nestHead nestHeadStacked">
-          <div className="nestHeadTop">
-            {campusClock?.fullLabel ? <p className="nestDate">{campusClock.fullLabel}</p> : <span />}
-            <div className="nestHeadSide">
-              <Link className="nestIconBtn" href="/notices" aria-label="Open notices">
-                <Bell size={18} aria-hidden="true" />
-                {noticesPreview.length > 0 && <span className="nestBellDot" aria-hidden="true" />}
-              </Link>
-              <Link className="nestAvatar" href="/profile" aria-label="Open my profile">
-                {profilePhoto ? <img src={profilePhoto} alt="" /> : initials}
-              </Link>
+      {/* ---- Greeting + identity + dynamic summary ---- */}
+      <section className="hubHero">
+        <div className="hubHeroText" suppressHydrationWarning>
+          {dateLine && <div className="hubDateLine">{dateLine}</div>}
+          <h1>
+            {greetingText}
+            {firstName ? `, ${firstName}` : ""}
+          </h1>
+          <p className="hubSummary">{summaryLine}</p>
+        </div>
+        <div className="rollCard" suppressHydrationWarning>
+          <small>Student roll</small>
+          <b>{liveAttendance ? liveAttendance.roll || "IMS connected" : "IMS not connected"}</b>
+          <span className="rollMeta">
+            {liveAttendance
+              ? `${attendanceFresh ? "Live IMS" : "Saved attendance"} · synced ${new Date(liveAttendance.syncedAt).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}`
+              : "Sign in to load your attendance"}
+          </span>
+        </div>
+      </section>
+
+      {/* ---- Metric cards ---- */}
+      <section className="summaryCards">
+        <div className="summaryCard attCard">
+          <Activity className="scIcon att" size={20} aria-hidden="true" />
+          <small>Overall attendance</small>
+          <b>{heldTotal ? `${overall.toFixed(1)}%` : "—"}</b>
+          <span className="scFoot">
+            {liveAttendance ? (attendanceFresh ? "Fetched from NSUT IMS" : "Saved from NSUT IMS") : "Connect to IMS first"}
+          </span>
+        </div>
+        <a className="summaryCard sgpaCard" href={me ? `/student/${encodeURIComponent(me.roll)}` : "/results"}>
+          <GraduationCap className="scIcon sgpa" size={20} aria-hidden="true" />
+          <small>Latest SGPA</small>
+          <b>{latestSgpa !== null ? latestSgpa.toFixed(2) : "—"}</b>
+          <span className="scFoot">
+            {me ? `Sem ${me.semester} · ${me.ay}-${String(me.ay + 1).slice(-2)} · ` : ""}
+            Result details <ArrowUpRight size={12} aria-hidden="true" />
+          </span>
+        </a>
+        <Link className="summaryCard notCard" href="/notices">
+          <span className="scIcon not"><BellRing size={18} aria-hidden="true" /></span>
+          <small>Notices this week</small>
+          <b>{noticeStore.payload ? String(newThisWeek).padStart(2, "0") : "—"}</b>
+          <span className="scFoot">
+            {noticeStore.payload ? "Latest from the IMS board" : "Loading notices"}
+            <ArrowUpRight size={12} aria-hidden="true" />
+          </span>
+        </Link>
+        <a className="summaryCard examCard" href="#exams">
+          <CalendarDays className="scIcon exam" size={20} aria-hidden="true" />
+          <small>Upcoming examination</small>
+          <b>
+            {nextCountdown
+              ? nextCountdown.status === "today"
+                ? "Today"
+                : `${nextCountdown.daysRemaining}`
+              : "—"}
+            {nextCountdown && nextCountdown.status !== "today" && <span className="scUnit"> days</span>}
+          </b>
+          <span className="scFoot">
+            {nextExam
+              ? `${nextExam.code} · ${formatExamDate(nextExam.isoDate).formattedDate}`
+              : studentExams.length
+                ? "No upcoming exam on the sheet"
+                : "Sign in to match your date sheet"}
+            {nextExam && <ArrowUpRight size={12} aria-hidden="true" />}
+          </span>
+        </a>
+      </section>
+
+      {/* ---- Personalised date sheet ---- */}
+      <section className="examScheduleSection" id="exams">
+        <div className="hubCard examScheduleCard">
+          <div className="examPrintLetterhead" suppressHydrationWarning>
+            <b>NETAJI SUBHAS UNIVERSITY OF TECHNOLOGY</b>
+            <span>Azad Hind Fauj Marg, Sector-3, Dwarka, New Delhi - 110078</span>
+            <small>OFFICE OF THE CONTROLLER OF EXAMINATION</small>
+            <h3>End-Semester Examination Date Sheet (Odd Semester 2026-27)</h3>
+            <div className="examPrintStudentMeta">
+              <span><b>Student:</b> {rawName || "Student"}</span>
+              <span><b>Roll No:</b> {liveAttendance?.roll || "—"}</span>
+              <span><b>Semester:</b> {liveAttendance?.selectedSemester || liveAttendance?.semester || "—"}</span>
             </div>
           </div>
-          <div className="nestHeadCopy" suppressHydrationWarning>
-            <h1>
-              {greetingText}
-              {firstName ? `, ${firstName}` : ""}
-            </h1>
-            <p className="nestHeadNote">
-              {liveAttendance
-                ? `${attendanceFresh ? "Live from IMS" : "Saved attendance"} · ${liveAttendance.roll}`
-                : "Connect NSUT IMS to personalise this page"}
-            </p>
-          </div>
-        </header>
 
-        <section className={`nestExamHero ${nextExam ? "" : "isClear"}`} aria-labelledby="nextExamTitle">
-          <div className="nestHeroTop">
-            <span className="nestHeroKicker">
-              <span className="nestHeroDot" aria-hidden="true" />
-              {nextExam ? "Next exam" : "Next up"}
-            </span>
-            <span className="nestHeroCountdown">
-              {nextExam && nextCountdown ? nextCountdown.label.toLowerCase() : studentExams.length ? "Sheet complete" : "—"}
-            </span>
-          </div>
-
-          {nextExam ? (
-            <>
-              <h2 id="nextExamTitle">{nextExam.name}</h2>
-              <p className="nestHeroMeta">
-                <b>{nextExam.code}</b>
-                <span>{formatExamDate(nextExam.isoDate).dayOfWeek}, {formatExamDate(nextExam.isoDate).formattedDate}</span>
-                <span>{nextExam.shift} · {nextExam.time}</span>
-              </p>
-              {laterExams[0] && (
-                <Link className="nestHeroThen" href="#exams">
-                  Then: {laterExams[0].name}, {formatExamDate(laterExams[0].isoDate).formattedDate}
-                  <ChevronRight size={13} aria-hidden="true" />
-                </Link>
-              )}
-            </>
-          ) : (
-            <>
-              <h2 id="nextExamTitle">{liveAttendance ? "No upcoming exam on the tentative sheet" : "Connect IMS to see your exam dates"}</h2>
-              <p className="nestHeroMeta">
-                {liveAttendance
-                  ? "Your current subjects are matched against the official COE date sheet."
-                  : "Attendance and your personalised end-sem schedule load together."}
-              </p>
-            </>
-          )}
-
-          <div className="nestHeroActions">
-            <Link className="nestBtn nestBtnLight" href="#exams">
-              Full schedule <ChevronRight size={14} aria-hidden="true" />
-            </Link>
-            {nextExam ? (
-              <button className="nestBtn nestBtnGhost" type="button" onClick={() => downloadExamCalendar([nextExam], rawName || "nsut-nest")}>
-                <CalendarPlus size={14} aria-hidden="true" /> Add to calendar
-              </button>
-            ) : !liveAttendance ? (
-              <button className="nestBtn nestBtnGhost" type="button" onClick={() => requestAttendanceRefresh()}>
-                <Activity size={14} aria-hidden="true" /> Connect IMS
-              </button>
-            ) : null}
-          </div>
-        </section>
-
-        <section className="nestSection" id="today" aria-labelledby="todayTitle">
-          <div className="nestSectionHead">
+          <div className="hubCardHead examCardHead">
             <div>
-              <p className="nestKicker">Upcoming classes</p>
-              <h2 id="todayTitle">{campusClock?.dayLong ?? "Today"}</h2>
+              <small className="panelKicker">End-sem date sheet · Odd Semester 2026-27</small>
+              <h2>{liveAttendance ? "Your exam schedule" : "End-sem exam schedule"}</h2>
             </div>
-            <Link className="nestTextLink" href="/timetable">Full timetable <ChevronRight size={12} aria-hidden="true" /></Link>
-          </div>
-
-          {!campusClock || (timetableLoading && !timetable) ? (
-            <Skeleton rows={2} />
-          ) : !timetable ? (
-            <div className="nestEmpty">
-              <CalendarDays size={22} aria-hidden="true" />
-              <div>
-                <b>{timetableError ? "Timetable unavailable" : "No timetable saved yet"}</b>
-                <p>{timetableError || "Connect IMS once and your classes will stay saved in this browser."}</p>
-              </div>
-              <button className="nestBtn nestBtnSmall" type="button" onClick={refreshTimetable}>
-                <RefreshCw size={13} aria-hidden="true" /> {timetableNeedsIms ? "Connect IMS" : "Try again"}
-              </button>
-            </div>
-          ) : !timetableToday.length ? (
-            <div className="nestEmpty">
-              <CalendarDays size={22} aria-hidden="true" />
-              <div>
-                <b>No classes scheduled for {campusClock.dayLong}</b>
-                <p>{[timetable.academicYear, timetable.semester ? `Semester ${timetable.semester}` : null, "Enjoy the free day."].filter(Boolean).join(" · ")}</p>
-              </div>
-            </div>
-          ) : (
-            <>
-              <div className="nestClassScroll" role="list" aria-label="Today's timetable" tabIndex={0}>
-                {timetableToday.map((slot) => {
-                  const isNow = timetableCurrent.some((item) => item.period === slot.period && item.startMinutes === slot.startMinutes);
-                  const isNext = timetableNext?.period === slot.period && timetableNext?.startMinutes === slot.startMinutes;
-                  const isPast = slot.endMinutes <= (campusClock?.minutes ?? 0);
-                  return (
-                    <article
-                      className={`nestClassCard ${isNow ? "now" : isNext ? "next" : isPast ? "past" : ""}`.trim()}
-                      role="listitem"
-                      key={`${slot.day}-${slot.period}-${slot.start}-${slot.entries.map((entry) => entry.code).join("-")}`}
-                    >
-                      <div className="nestClassTop">
-                        <span className="nestClassTime"><Clock size={12} aria-hidden="true" /> {formatTimeRange(slot.startMinutes, slot.endMinutes)}</span>
-                        {(isNow || isNext) && <span className="nestClassBadge">{isNow ? "Now" : "Next"}</span>}
-                      </div>
-                      <div className="nestClassEntries">
-                        {slot.entries.map((entry, index) => (
-                          <div className="nestClassEntry" key={`${entry.code}-${entry.kind}-${entry.group ?? ""}-${entry.room ?? ""}-${index}`}>
-                            <b>{subjectNames.get(entry.code.toUpperCase()) || entry.code}</b>
-                            <span>{entryMeta(entry)}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </article>
-                  );
-                })}
-              </div>
-              <div className="nestTinyFoot">
-                <span>Times in IST{timetable.semester ? ` · Sem ${timetable.semester}` : ""}</span>
-                <span>
-                  {timetableLoading ? "Updating…" : timetableError ? "Saved copy · live refresh unavailable" : timetableSynced ? `Saved offline · synced ${timetableSynced}` : "Saved offline"}
-                </span>
-              </div>
-            </>
-          )}
-        </section>
-
-        <section className="nestSection" id="attendance" aria-labelledby="homeAttTitle">
-          <div className="nestSectionHead">
-            <div>
-              <p className="nestKicker">Attendance</p>
-              <h2 id="homeAttTitle">Critical subjects</h2>
-            </div>
-            <Link className="nestTextLink" href="/attendance">All subjects <ChevronRight size={12} aria-hidden="true" /></Link>
-          </div>
-
-          {!attendanceReady ? (
-            <Skeleton rows={2} />
-          ) : !liveAttendance ? (
-            <div className="nestEmpty">
-              <AlertTriangle size={22} aria-hidden="true" />
-              <div><b>Connect IMS to see attendance</b><p>Subject-wise percentages load with your first sync.</p></div>
-              <button className="nestBtn nestBtnSmall" type="button" onClick={() => requestAttendanceRefresh()}>Connect IMS</button>
-            </div>
-          ) : (
-            <>
-              {atRiskRows.length ? (
-                <div className="critRows">
-                  {atRiskRows.map((row) => (
-                    <button
-                      className="critRow"
-                      type="button"
-                      key={row.code}
-                      onClick={() => setSheetCode(row.code)}
-                      aria-label={`${row.name || row.code}, ${row.percent.toFixed(1)} percent. Open what-if and calendar`}
-                    >
-                      <span className="critName"><span className="attCode">{row.code}</span><b>{row.name || row.code}</b></span>
-                      <span className="critPct">{row.percent.toFixed(1)}%</span>
-                      <span className="critBar"><i style={{ width: `${Math.max(0, Math.min(100, row.percent))}%` }} /><u /></span>
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                <div className="nestEmpty">
-                  <ShieldCheck size={22} aria-hidden="true" />
-                  <div><b>No subject below 75%</b><p>Nothing critical right now.</p></div>
-                </div>
-              )}
-            </>
-          )}
-        </section>
-
-        <section className="nestSection" aria-labelledby="todoTitle">
-          <div className="nestSectionHead">
-            <div>
-              <p className="nestKicker">To-do</p>
-              <h2 id="todoTitle">Your list</h2>
-            </div>
-          </div>
-          <TodoList />
-        </section>
-
-        <section className="nestSection" id="notices" aria-labelledby="noticesTitle">
-          <div className="nestSectionHead">
-            <div>
-              <p className="nestKicker">Notice board</p>
-              <h2 id="noticesTitle">Latest notices</h2>
-            </div>
-            <Link className="nestTextLink" href="/notices">See all <ArrowUpRight size={12} aria-hidden="true" /></Link>
-          </div>
-
-          {noticeStore.error && !noticeStore.payload ? (
-            <div className="nestEmpty">
-              <AlertTriangle size={22} aria-hidden="true" />
-              <div><b>Notices unavailable</b><p>{noticeStore.error}</p></div>
-              <button className="nestBtn nestBtnSmall" type="button" onClick={retryNotices} disabled={retryingNotices}>
-                <RefreshCw size={13} className={retryingNotices ? "attSpinIcon" : ""} aria-hidden="true" /> Retry
-              </button>
-            </div>
-          ) : !noticeStore.payload ? (
-            <Skeleton rows={3} />
-          ) : !noticesPreview.length ? (
-            <div className="nestEmpty"><BellRing size={22} aria-hidden="true" /><div><b>No notices right now</b><p>The IMS board is clear.</p></div></div>
-          ) : (
-            <div className="nestNoticeList">
-              {noticesPreview.map((notice) => (
-                <a
-                  className="nestNoticeRow"
-                  key={`${notice.isoDate}-${notice.title}`}
-                  href={notice.href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label={`Open PDF: ${notice.title}`}
+            <div className="examScheduleActions">
+              <span className="examScheduleNoticeTag">Tentative · COE 06/11/2026</span>
+              {liveAttendance && studentExams.length > 0 && (
+                <button
+                  type="button"
+                  className="panelLink examPrintButton"
+                  onClick={() => window.print()}
+                  title="Print your end-sem exam schedule"
                 >
-                  <span className="nestNoticeIcon"><BellRing size={15} aria-hidden="true" /></span>
-                  <span className="nestNoticeText">
-                    <b>{notice.title}</b>
-                    <small>
-                      {notice.department || "NSUT"} · <time dateTime={notice.isoDate}>{relativeNoticeDate(notice.isoDate)}</time>
-                    </small>
-                  </span>
-                  <ArrowUpRight size={14} className="nestNoticeChev" aria-hidden="true" />
-                </a>
-              ))}
+                  <Printer size={13} aria-hidden="true" /> Print date sheet
+                </button>
+              )}
             </div>
-          )}
-        </section>
-
-                  <section className="nestSection" id="exams" aria-labelledby="examScheduleTitle">
-          <div className="nestSectionHead">
-            <div>
-              <p className="nestKicker">Exam schedule</p>
-              <h2 id="examScheduleTitle">Tentative end-sem sheet</h2>
-            </div>
-            <span className="nestTag">Tentative</span>
           </div>
 
-          {!attendanceReady ? (
-            <Skeleton rows={3} />
-          ) : !liveAttendance ? (
-            <div className="nestEmpty nestEmptyOnCard">
-              <CalendarDays size={22} aria-hidden="true" />
-              <div><b>Connect IMS to see your exams</b><p>Your registered subjects are matched with the official COE date sheet.</p></div>
-              <button className="nestBtn nestBtnSmall" type="button" onClick={() => requestAttendanceRefresh()}>Connect IMS</button>
+          {!liveAttendance ? (
+            <div className="examScheduleUnsigned">
+              <CalendarDays size={26} className="examScheduleUnsignedIcon" aria-hidden="true" />
+              <div className="examScheduleUnsignedText">
+                <h3>Personalised exam dates for your subjects</h3>
+                <p>Sign in to NSUT IMS above to match your registered subjects with the official end-sem date sheet.</p>
+              </div>
             </div>
-          ) : !studentExams.length ? (
-            <div className="nestEmpty nestEmptyOnCard">
-              <CalendarDays size={22} aria-hidden="true" />
-              <div><b>No exams on the tentative sheet</b><p>Your current subjects are practical or continuous-evaluation courses.</p></div>
+          ) : studentExams.length === 0 ? (
+            <div className="examScheduleUnsigned">
+              <CalendarDays size={26} className="examScheduleUnsignedIcon" aria-hidden="true" />
+              <div className="examScheduleUnsignedText">
+                <h3>No written exams scheduled in the tentative date sheet</h3>
+                <p>Your current subjects are practical or continuous-evaluation courses.</p>
+              </div>
             </div>
           ) : (
             <>
-              <div className="nestExamRows">
-                {studentExams.map((exam) => {
-                  const { dayOfWeek, formattedDate } = formatExamDate(exam.isoDate);
+              {nextExam && nextCountdown && (
+                <div className="examNextSpotlight">
+                  <div className="examNextSpotlightContent">
+                    <span className="examNextBadge">Next upcoming exam</span>
+                    <h3>{nextExam.name}</h3>
+                    <div className="examNextDetails">
+                      <span className="examNextCode">{nextExam.code}</span>
+                      <span>
+                        {formatExamDate(nextExam.isoDate).dayOfWeek}, {formatExamDate(nextExam.isoDate).formattedDate}
+                      </span>
+                      <span className="examNextShift">
+                        <Clock size={12} aria-hidden="true" /> {nextExam.shift} · {nextExam.time}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="examNextCountdown">
+                    <span className={`examCountdownBadge ${nextCountdown.status}`}>{nextCountdown.label}</span>
+                  </div>
+                </div>
+              )}
+
+              <div className="studentExamList">
+                {laterExams.map((exam) => {
                   const countdown = getExamCountdown(exam.isoDate);
-                  const isNext = exam.code === nextExam?.code;
+                  const { dayOfWeek, formattedDate } = formatExamDate(exam.isoDate);
                   return (
-                    <div className={`nestExamRow ${isNext ? "isNext" : ""}`} key={`${exam.code}-${exam.isoDate}`}>
-                      <div className="nestExamDate">
+                    <div key={exam.code} className={`studentExamRow ${countdown.status === "passed" ? "isPassed" : ""}`}>
+                      <div className="studentExamDate">
                         <b>{formattedDate.split(" ")[0]}</b>
                         <span>{formattedDate.split(" ")[1]}</span>
                         <small>{dayOfWeek.slice(0, 3)}</small>
                       </div>
-                      <div className="nestExamBody">
-                        <h3>{exam.name}</h3>
-                        <p>
-                          {exam.code} · {exam.shift}
-                          <span className={`nestExamDays ${countdown.status}`}>{countdown.label}</span>
-                        </p>
-                        {isNext && <em>Next exam</em>}
+                      <div className="studentExamBody">
+                        <div className="studentExamTitleRow">
+                          <h4>{exam.name}</h4>
+                          <span className="attCode">{exam.code}</span>
+                        </div>
+                        <div className="studentExamSubRow">
+                          <span className="studentExamShift">
+                            <Clock size={12} aria-hidden="true" /> {exam.shift} · {exam.time}
+                          </span>
+                        </div>
                       </div>
+                      <div className="studentExamStatus">
+                        <span className={`examCountdownBadge ${countdown.status}`}>{countdown.label}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+                {!nextExam && !laterExams.length && (
+                  <p className="examEmptyList">No exams are left on this date sheet.</p>
+                )}
+              </div>
+
+              <div className="examScheduleFooter">
+                <span>Shift 1: 10:00 AM – 01:00 PM · Shift 2: 02:00 PM – 05:00 PM</span>
+                <span className="examDiscrepancy">
+                  Clashes or discrepancies? Email <a href="mailto:examination@nsut.ac.in">examination@nsut.ac.in</a>
+                </span>
+              </div>
+            </>
+          )}
+        </div>
+      </section>
+
+      {/* ---- Attendance + notices/rail ---- */}
+      <section className="duoGrid">
+        <div className="hubCard attPanel" id="attendance">
+          {attendanceRefreshing && (
+            <div className="attRefreshOverlay" role="status" aria-live="polite">
+              <div className="attRefreshOverlayInner">
+                <Loader2 size={34} className="attSpinIcon" aria-hidden="true" />
+                <strong>Updating attendance…</strong>
+                <span>Fetching the latest records from IMS</span>
+              </div>
+            </div>
+          )}
+
+          <div className="hubCardHead attHead">
+            <div className="attHeadText">
+              <small className="panelKicker attKicker">
+                <span className="attLiveDot" aria-hidden="true" />
+                Live status
+              </small>
+              <h2>Attendance</h2>
+              <span className="attSyncedInline">
+                {liveAttendance
+                  ? `Synced ${new Date(liveAttendance.syncedAt).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}`
+                  : "Not synced yet"}
+              </span>
+            </div>
+            <div className="attPanelActions">
+              {liveAttendance && (
+                <button
+                  className="attRefreshButton"
+                  type="button"
+                  onClick={() => requestAttendanceRefresh()}
+                  disabled={attendanceRefreshing || !online}
+                  aria-label={online ? "Refresh attendance from IMS" : "Offline. Reconnect to refresh attendance."}
+                  title={
+                    online
+                      ? "Fetch the latest attendance from NSUT IMS. If your IMS ID is saved on this device, only the CAPTCHA is asked for."
+                      : "You are offline. Reconnect to refresh attendance."
+                  }
+                >
+                  <RefreshCw size={14} className={attendanceRefreshing ? "attSpinIcon" : undefined} aria-hidden="true" />
+                  {attendanceRefreshing ? "Updating…" : online ? "Refresh IMS" : "Offline"}
+                </button>
+              )}
+            </div>
+          </div>
+
+          {!attendanceReady ? (
+            <Skeleton rows={5} />
+          ) : !liveAttendance || !subjectRows.length ? (
+            <div className="attEmpty">
+              <TrendingUp size={26} aria-hidden="true" />
+              <p>Sign in to NSUT IMS to load your real subject-wise attendance. No estimated attendance is shown.</p>
+            </div>
+          ) : (
+            <div className="attSummary">
+              <Gauge percent={overall} />
+              <div className="attSummaryText">
+                <div className="attSummaryTop">
+                  <div>
+                    <span className="attSummaryEyebrow">Overall standing</span>
+                    <h3>{overall >= POLICY ? "Above 75% line" : "Below 75% line"}</h3>
+                  </div>
+                  <span className={`attDelta ${overall >= POLICY ? "good" : "low"}`}>
+                    {overall >= POLICY ? "+" : "−"}{Math.abs(overall - POLICY).toFixed(1)} pts
+                  </span>
+                </div>
+                <div className="attSummaryStats">
+                  <div><b>{attendedTotal}</b><span>attended</span></div>
+                  <div><b>{heldTotal}</b><span>classes</span></div>
+                  <div><b>{subjectRows.length}</b><span>subjects</span></div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {subjectRows.length > 0 && (
+            <>
+              <div className="attListTools">
+                <span className="attListLabel">
+                  Subject breakdown
+                  <small>{subjectRows.length}</small>
+                </span>
+                <div className="attListActions">
+                  <button
+                    className="attToolButton"
+                    type="button"
+                    onClick={() => setSortByRisk((value) => !value)}
+                    aria-pressed={sortByRisk}
+                  >
+                    <ArrowDownUp size={14} aria-hidden="true" />
+                    {sortByRisk ? "Risk first" : "Default order"}
+                  </button>
+                </div>
+              </div>
+
+              <div className="attRows">
+                {orderedRows.map((row) => {
+                  const expanded = selectedAttendanceSubject === row.code;
+                  const tone = attendanceTone(row.percent, row.held);
+                  const months = subjectAttendanceMonths(liveAttendance?.daily, row.code);
+                  const percentLabel = row.held ? `${row.percent.toFixed(1)}%` : "";
+                  return (
+                    <div className={`attRow attRow--${tone} ${expanded ? "expanded" : ""}`} key={row.code} id={`att-row-${row.code}`}>
                       <button
-                        className="nestExamAdd"
+                        className="attSubjectButton"
                         type="button"
-                        onClick={() => window.print()}
-                        aria-label="Print exam sheet"
-                        title="Print exam sheet"
+                        aria-expanded={expanded}
+                        onClick={() => {
+                          if (expanded) {
+                            setSelectedAttendanceSubject(null);
+                          } else {
+                            setSelectedAttendanceSubject(row.code);
+                            setAttendanceCalendarMonth(months.length ? months[months.length - 1] : "");
+                          }
+                        }}
                       >
-                        <Printer size={15} aria-hidden="true" />
+                        <span className="attRowText">
+                          <span className="attRowTitle">
+                            {row.title}
+                            {row.title !== row.code && <span className="attCode">{row.code}</span>}
+                          </span>
+                          <span className="attRowStats">
+                            {row.held ? <><b>{row.attended}</b> of <b>{row.held}</b> classes</> : "No classes held yet"}
+                          </span>
+                          {row.held > 0 && (
+                            <span className="attRowFoot">
+                              <StatusChip tone={tone} />
+                              <span className={`attAction ${tone}`}>{actionLine(row, tone)}</span>
+                            </span>
+                          )}
+                        </span>
+                        <span className="attSubjectActions">
+                          {percentLabel && <b className={`attPct ${tone}`}>{percentLabel}</b>}
+                          <ChevronRight size={16} className={expanded ? "attSubjectChevron expanded" : "attSubjectChevron"} aria-hidden="true" />
+                        </span>
                       </button>
+
+                      {expanded && liveAttendance && (
+                        <div className="attExpanded">
+                          {row.held > 0 && <SkipEstimator subject={row} />}
+                          <SubjectAttendanceCalendar
+                            subject={row}
+                            daily={liveAttendance.daily ?? []}
+                            attendanceLegend={liveAttendance.attendanceLegend}
+                            statusLegend={liveAttendance.statusLegend}
+                            month={attendanceCalendarMonth}
+                            months={months}
+                            onMonthChange={setAttendanceCalendarMonth}
+                          />
+                        </div>
+                      )}
                     </div>
                   );
                 })}
               </div>
-              <p className="nestReminder"><BellRing size={13} aria-hidden="true" /> Results include SGPA and grade details.</p>
             </>
           )}
-        </section>
-
-        {sheetSubject && (
-          <SubjectSheet
-            subject={{
-              title: sheetSubject.name || sheetSubject.code,
-              code: sheetSubject.code,
-              attended: sheetSubject.present,
-              held: sheetSubject.held,
-              percent: sheetSubject.percent,
-            }}
-            daily={liveAttendance?.daily ?? []}
-            attendanceLegend={liveAttendance?.attendanceLegend}
-            statusLegend={liveAttendance?.statusLegend}
-            onClose={() => setSheetCode(null)}
-          />
-        )}
-
-        <footer className="nestFooter">
-          <span>NSUT Nest · real IMS data, saved on this device</span>
-          <Link href="/profile">My profile</Link>
-        </footer>
-
-        <div className="nestPrintHead" suppressHydrationWarning>
-          <b>NETAJI SUBHAS UNIVERSITY OF TECHNOLOGY</b>
-          <span>Azad Hind Fauj Marg, Sector-3, Dwarka, New Delhi - 110078</span>
-          <small>OFFICE OF THE CONTROLLER OF EXAMINATION · END-SEMESTER, ODD 2026–27</small>
-          <p>{rawName || "Student"} · {liveAttendance?.roll || "—"} · Semester {liveAttendance?.selectedSemester || liveAttendance?.semester || "—"}</p>
         </div>
-      </div>
+
+        <div className="duoRail">
+          <div className="hubCard noticesPanel">
+            <div className="hubCardHead">
+              <div>
+                <small className="panelKicker">Circulars &amp; orders</small>
+                <h2>Important notices</h2>
+              </div>
+              <Link className="panelLink" href="/notices">
+                View all notices <ArrowUpRight size={13} aria-hidden="true" />
+              </Link>
+            </div>
+
+            {noticesUsingCache && noticeStore.payload && (
+              <p className="panelOffline">
+                Offline · saved {relativeNoticeDate(new Date(noticeStore.payload.fetchedAt).toISOString().slice(0, 10))}
+              </p>
+            )}
+
+            {renderNoticePreview()}
+          </div>
+        </div>
+      </section>
+
+      {/* ---- Campus spots ---- */}
+      <section className="hangouts">
+        <div className="hubCardHead hangoutsHead">
+          <div>
+            <small className="panelKicker">Campus spots</small>
+            <h2>Popular hangouts</h2>
+          </div>
+          <button className="panelLink campusExploreButton" type="button" onClick={() => setCampusMapOpen(true)}>
+            Explore campus <ArrowUpRight size={13} aria-hidden="true" />
+          </button>
+        </div>
+        <div className="hangoutGrid sharedHangoutGrid">
+          {SHARED_HANGOUTS.map((hangout) => (
+            <a className="hangoutCard sharedHangoutCard" key={hangout.url} href={hangout.url} target="_blank" rel="noreferrer">
+              <div className="hangoutImg sharedHangoutPhoto">
+                <img src={hangout.img} alt={hangout.alt} loading="lazy" width="900" height="560" />
+                <span className="sharedHangoutPhotoLabel"><MapPin size={13} aria-hidden="true" /> Popular hangout</span>
+              </div>
+              <div className="hangoutMeta">
+                <div className="hangoutName">
+                  <h3>{hangout.name}</h3>
+                  <p><MapPin size={12} aria-hidden="true" /> {hangout.place}</p>
+                </div>
+                <ArrowUpRight size={16} aria-hidden="true" />
+              </div>
+            </a>
+          ))}
+        </div>
+      </section>
+
+      {campusMapOpen && (
+        <div
+          className="campusMapOverlay"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setCampusMapOpen(false);
+          }}
+        >
+          <section className="campusMapDialog" role="dialog" aria-modal="true" aria-label="NSUT campus map">
+            <div className="campusMapHeader">
+              <div><small className="panelKicker">Campus overview</small><h2>Campus map</h2></div>
+              <button type="button" className="campusMapClose" aria-label="Close campus map" onClick={() => setCampusMapOpen(false)}>
+                <X size={20} />
+              </button>
+            </div>
+            <img
+              className="campusMapImage"
+              src="/campus-map.png"
+              alt="Illustrated map of the NSUT campus with academic blocks, hostels, grounds, library and main gate"
+            />
+          </section>
+        </div>
+      )}
     </>
   );
 }

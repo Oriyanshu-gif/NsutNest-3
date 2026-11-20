@@ -3,14 +3,14 @@ import { load } from 'cheerio';
 import { safeUpstreamError } from '../../../../../lib/ims-auth-errors';
 import {
   IMS_BASE_URL,
+  IMS_COOKIE_NAME,
+  encodeImsSession,
+  imsCookieOptions,
   pageText,
   readImsSession,
   requestIms,
   requestImsImage,
   type ImsHttpSession,
-  clearImsSession,
-  readImsSessionFrom,
-  setImsSession,
 } from '../../../../../lib/ims-http';
 import {
   detectImageMimeType,
@@ -35,7 +35,7 @@ const MAX_INLINE_IMAGES = 6;
 const MAX_IMAGE_BYTES = 4_000_000;
 
 function clearImsCookie(response: NextResponse) {
-  clearImsSession(response);
+  response.cookies.set(IMS_COOKIE_NAME, '', { ...imsCookieOptions(), maxAge: 0 });
   return response;
 }
 
@@ -83,7 +83,7 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const session = readImsSessionFrom(request);
+  const session = readImsSession(request.cookies.get(IMS_COOKIE_NAME)?.value);
   if (!session || session.stage !== 'attendance' || !session.studentRoll) {
     // `needsLogin` tells the page to run the same sign-in card as attendance
     // (CAPTCHA only when the credentials are saved) and then retry the print.
@@ -127,7 +127,7 @@ export async function GET(request: NextRequest) {
 
     // Persist any cookies IMS refreshed, without failing a good printout.
     try {
-      setImsSession(response, session);
+      response.cookies.set(IMS_COOKIE_NAME, encodeImsSession(session), imsCookieOptions());
     } catch {
       // The current cookie still holds a valid session.
     }

@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { safeUpstreamError } from '../../../../lib/ims-auth-errors';
 import {
+  encodeImsSession,
+  IMS_COOKIE_NAME,
+  imsCookieOptions,
   readImsSession,
-  clearImsSession,
-  readImsSessionFrom,
-  setImsSession,
 } from '../../../../lib/ims-http';
 import {
   discoverProfileUrl,
@@ -24,7 +24,7 @@ export const dynamic = 'force-dynamic';
 const PROFILE_LIMIT = { limit: 30, windowMs: 60_000 };
 
 function clearImsCookie(response: NextResponse) {
-  clearImsSession(response);
+  response.cookies.set(IMS_COOKIE_NAME, '', { ...imsCookieOptions(), maxAge: 0 });
   return response;
 }
 
@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const session = readImsSessionFrom(request);
+  const session = readImsSession(request.cookies.get(IMS_COOKIE_NAME)?.value);
   if (!session || session.stage !== 'attendance' || !session.studentRoll) {
     return NextResponse.json(
       { error: 'Sign in to NSUT IMS to view your profile.' },
@@ -57,7 +57,7 @@ export async function GET(request: NextRequest) {
     // Persist the newly discovered link and any cookies IMS refreshed, but never
     // fail an otherwise successful profile read if the cookie is at its limit.
     try {
-      setImsSession(response, session);
+      response.cookies.set(IMS_COOKIE_NAME, encodeImsSession(session), imsCookieOptions());
     } catch {
       // The current cookie still holds a valid session; the link is rediscovered next time.
     }
